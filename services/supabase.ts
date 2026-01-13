@@ -1,10 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 
-// ID CORRIGIDO (Baseado no seu print do Dashboard)
-const supabaseUrl = 'https://exvwyiwiagpzoohtjyhh.supabase.co';
-
-const supabaseAnonKey = 
-  import.meta.env.VITE_SUPABASE_ANON_KEY || 
-  ''; // Se tiver a chave anon, pode colar aqui entre aspas para testar rápido
+// Usamos 'as any' para o TypeScript parar de reclamar do 'env'
+const supabaseUrl = (import.meta as any).env.VITE_SUPABASE_URL || 'https://exvwyiwiagpzoohtjyhh.supabase.co';
+const supabaseAnonKey = (import.meta as any).env.VITE_SUPABASE_ANON_KEY || '';
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
