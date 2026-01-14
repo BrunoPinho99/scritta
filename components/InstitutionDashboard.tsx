@@ -205,7 +205,7 @@ const InstitutionDashboard: React.FC<InstitutionDashboardProps> = ({ initialTab 
         if (activeTab !== 'students') setActiveTab('students');
         if (activeTab !== 'students') setActiveTab('students');
 
-        const inviteLink = `${window.location.origin}/?invite_token=${createdStudent.token}`;
+        const inviteLink = `https://littera.app.br/?invite_token=${createdStudent.token}`;
         alert(`Aluno cadastrado!\n\nSe o e-mail não chegar, envie este link:\n${inviteLink}`);
       }
     } catch (error: any) {
@@ -230,7 +230,7 @@ const InstitutionDashboard: React.FC<InstitutionDashboardProps> = ({ initialTab 
   };
 
   const handleCopyInviteLink = (token: string) => {
-    const inviteLink = `${window.location.origin}/?invite_token=${token}`;
+    const inviteLink = `https://littera.app.br/?invite_token=${token}`;
     navigator.clipboard.writeText(inviteLink).then(() => {
       alert("Link de convite copiado para a área de transferência!");
     }).catch(err => {

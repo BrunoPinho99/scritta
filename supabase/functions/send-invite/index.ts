@@ -34,25 +34,33 @@ serve(async (req) => {
         'Authorization': `Bearer ${RESEND_API_KEY}`,
       },
       body: JSON.stringify({
-        from: 'Scritta App <onboarding@resend.dev>', // Use este remetente para testes
+        // AQUI ESTÁ A MUDANÇA PRINCIPAL:
+        from: 'Equipe Littera <contato@littera.app.br>', 
         to: [email],
-        subject: `Convite: Junte-se ao ${schoolName} no Scritta`,
+        subject: `Convite: Junte-se ao ${schoolName} no Littera`,
         html: `
-          <div style="font-family: sans-serif; padding: 20px; color: #333;">
+          <div style="font-family: sans-serif; padding: 20px; color: #333; max-width: 600px; margin: 0 auto;">
             <h1 style="color: #4F46E5;">Você foi convidado!</h1>
-            <p>A instituição <strong>${schoolName}</strong> convidou você para acessar a plataforma como <strong>${role === 'student' ? 'Aluno' : 'Professor'}</strong>.</p>
+            <p>A instituição <strong>${schoolName}</strong> convidou você para acessar a plataforma <strong>Littera</strong> como <strong>${role === 'student' ? 'Aluno' : 'Professor'}</strong>.</p>
             <br/>
-            <a href="${inviteLink}" style="background-color: #4F46E5; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold;">
-              Aceitar Convite
+            <p>Clique no botão abaixo para criar sua senha e começar:</p>
+            <a href="${inviteLink}" style="background-color: #4F46E5; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
+              Aceitar Convite e Entrar
             </a>
             <br/><br/>
-            <p style="font-size: 12px; color: #666;">Ou copie este link: ${inviteLink}</p>
+            <p style="font-size: 12px; color: #666; margin-top: 20px;">Se o botão não funcionar, copie este link:<br/> ${inviteLink}</p>
           </div>
         `,
       }),
     });
 
     const data = await res.json();
+    
+    // Verifica se o Resend retornou erro mesmo com status 200 (acontece às vezes)
+    if (data.error) {
+       throw new Error(data.message || 'Erro no envio do Resend');
+    }
+
     return new Response(JSON.stringify(data), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,

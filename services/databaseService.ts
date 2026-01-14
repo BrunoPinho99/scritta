@@ -349,7 +349,7 @@ export const createProfessor = async (payload: { name: string, email: string, cl
   const { data: school } = await supabase.from('profiles').select('school_name').eq('id', payload.school_id).single();
   
   // Gera o link apontando para o seu site atual
-  const inviteLink = `${window.location.origin}/?invite_token=${inviteData.token}`;
+  const inviteLink = `https://littera.app.br/?invite_token=${inviteData.token}`;
 
   // Tenta enviar o e-mail em paralelo com Timeout de 5s
   // Se falhar, APENAS LOGA O ERRO, mas retorna sucesso para a interface
@@ -411,7 +411,7 @@ export const createStudent = async (payload: { name: string, email: string, clas
   // 2. DISPARAR EMAIL REAL
   const { data: school } = await supabase.from('profiles').select('school_name').eq('id', payload.school_id).single();
   
-  const inviteLink = `${window.location.origin}/?invite_token=${inviteData.token}`;
+  const inviteLink = `https://littera.app.br/?invite_token=${inviteData.token}`;
 
   // Chama a função que criamos no Passo 2
   // Tenta enviar o e-mail em paralelo com Timeout de 5s
@@ -463,4 +463,78 @@ export const deleteInvite = async (inviteId: string) => {
     .eq('id', inviteId);
 
   if (error) throw error;
+
+  // Gerar Notificação Automática
+  if (userId && userId !== 'demo') {
+    const score = essayData.result.totalScore;
+    await createNotification(
+      userId,
+      'correction',
+      'Redação Corrigida',
+      `Sua redação sobre "${topicTitle}" foi corrigida. Nota: ${score}.`
+    );
+  }
+};
+
+// ==========================================
+// FUNÇÕES DE NOTIFICAÇÃO
+// ==========================================
+
+export const createNotification = async (
+  userId: string,
+  type: 'correction' | 'ranking' | 'system' | 'tip' | 'assignment',
+  title: string,
+  message: string
+) => {
+  const { error } = await supabase
+    .from('notifications')
+    .insert({
+      user_id: userId,
+      type,
+      title,
+      message,
+      read: false
+    });
+
+  if (error) console.error("Erro ao criar notificação:", error);
+};
+
+export const getNotifications = async (userId: string) => {
+  const { data, error } = await supabase
+    .from('notifications')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error("Erro ao buscar notificações:", error);
+    return [];
+  }
+
+  return data.map((n: any) => ({
+    id: n.id,
+    type: n.type,
+    title: n.title,
+    message: n.message,
+    read: n.read,
+    timestamp: new Date(n.created_at).toLocaleDateString() + ' ' + new Date(n.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+  }));
+};
+
+export const markNotificationAsRead = async (notificationId: string) => {
+  const { error } = await supabase
+    .from('notifications')
+    .update({ read: true })
+    .eq('id', notificationId);
+
+  if (error) console.error("Erro ao marcar notificação como lida:", error);
+};
+
+export const markAllNotificationsAsRead = async (userId: string) => {
+  const { error } = await supabase
+    .from('notifications')
+    .update({ read: true })
+    .eq('user_id', userId);
+
+  if (error) console.error("Erro ao marcar todas como lidas:", error);
 };

@@ -16,11 +16,11 @@ import InstitutionDashboard from './components/InstitutionDashboard';
 // Types & Data
 import { Topic, CorrectionResult, EssayInput, Notification } from './types';
 import { exploreTopics } from './data/exploreTopics';
-import { notificationsData } from './data/notificationsData';
+
 
 // Services
 import { correctEssay } from './services/geminiService';
-import { saveEssayToDatabase } from './services/databaseService'; // Certifique-se que o arquivo se chama databaseService.ts (singular)
+import { saveEssayToDatabase, getNotifications, markNotificationAsRead, markAllNotificationsAsRead } from './services/databaseService'; // Certifique-se que o arquivo se chama databaseService.ts (singular)
 import { supabase } from './services/supabase'; // Caminho corrigido para services/supabase.ts
 
 const INITIAL_INDEX = Math.floor(Math.random() * exploreTopics.length);
@@ -45,6 +45,8 @@ const App: React.FC = () => {
   // Estado para controlar se há uma sessão de escrita ativa
   const [hasActiveSession, setHasActiveSession] = useState(false);
 
+  const [isCheckingRole, setIsCheckingRole] = useState(false);
+
   // Refs para evitar loops no useEffect de autenticação
   const currentViewRef = useRef(currentView);
   const hasActiveSessionRef = useRef(hasActiveSession);
@@ -55,7 +57,7 @@ const App: React.FC = () => {
   const [writingTopicTitle, setWritingTopicTitle] = useState("");
   const [isCorrecting, setIsCorrecting] = useState(false);
   const [correctionResult, setCorrectionResult] = useState<CorrectionResult | null>(null);
-  const [notifications, setNotifications] = useState<Notification[]>(notificationsData);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
   const [countdown, setCountdown] = useState<number | null>(null);
   const [essayStartTime, setEssayStartTime] = useState<number | null>(null);
   const [initialMode, setInitialMode] = useState<'text' | 'image'>('text');
@@ -93,6 +95,7 @@ const App: React.FC = () => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (session) {
         setSession(session);
+        setIsCheckingRole(true); // Inicia verificação de role
 
         // Busca a role real do banco para garantir segurança e redirecionamento correto
         let finalType: UserType = 'student';
@@ -116,15 +119,17 @@ const App: React.FC = () => {
         } catch (error) {
           console.error("Erro ao buscar role:", error);
           finalType = (session.user?.user_metadata?.user_type as UserType) || 'student';
-        }
+        } finally {
+          setUserType(finalType);
+          setIsCheckingRole(false); // Finaliza verificação
 
-        setUserType(finalType);
-
-        if (!hasActiveSessionRef.current && currentViewRef.current !== 'writing') {
-          setCurrentView(getDefaultView(finalType));
+          if (!hasActiveSessionRef.current && currentViewRef.current !== 'writing') {
+            setCurrentView(getDefaultView(finalType));
+          }
         }
       } else {
         setSession(null);
+        setIsCheckingRole(false);
         // Não reseta Demo Mode aqui automaticamente para evitar loop se fosse o caso, 
         // mas initApp já cuidou da limpeza inicial.
       }
@@ -168,7 +173,13 @@ const App: React.FC = () => {
         res
       );
 
-      // 3. Limpeza
+
+      // 3. Atualizar Notificações (para aparecer o badge imediatamente)
+      if (session?.user?.id) {
+        getNotifications(session.user.id).then(setNotifications);
+      }
+
+      // 4. Limpeza
       localStorage.removeItem(`draft_${writingTopicTitle}`);
       localStorage.removeItem('active_writing_session');
 
@@ -252,12 +263,26 @@ const App: React.FC = () => {
     localStorage.setItem('scritta_demo_type', t);
   };
 
-  const handleMarkAsRead = (id: string) => {
+
+  // Fetch Notifications on Session Change
+  useEffect(() => {
+    if (session?.user?.id) {
+      getNotifications(session.user.id).then(setNotifications);
+    } else {
+      setNotifications([]);
+    }
+  }, [session]);
+
+  const handleMarkAsRead = async (id: string) => {
+    await markNotificationAsRead(id);
     setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
   };
 
-  const handleMarkAllAsRead = () => {
-    setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+  const handleMarkAllAsRead = async () => {
+    if (session?.user?.id) {
+      await markAllNotificationsAsRead(session.user.id);
+      setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+    }
   };
 
   const renderView = () => {
@@ -353,7 +378,7 @@ const App: React.FC = () => {
     }
   };
 
-  if (isInitializing) {
+  if (isInitializing || isCheckingRole) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-background-light dark:bg-background-dark">
         <div className="w-16 h-16 bg-white dark:bg-slate-900 rounded-2xl flex items-center justify-center shadow-xl animate-pulse">
