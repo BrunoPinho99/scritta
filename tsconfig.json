@@ -27,9 +27,6 @@
     "allowImportingTsExtensions": true,
     "noEmit": true
   },
-  "include": [
-    "src"
-  ],
   "exclude": [
     "supabase",
     "node_modules",
