@@ -7,9 +7,10 @@ import { ClassGroup } from '../types';
 interface ProfileViewProps {
   user?: any;
   onManageSubscription?: () => void;
+  currentRole?: 'student' | 'teacher' | 'school_admin';
 }
 
-const ProfileView: React.FC<ProfileViewProps> = ({ user, onManageSubscription }) => {
+const ProfileView: React.FC<ProfileViewProps> = ({ user, onManageSubscription, currentRole }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
@@ -20,9 +21,11 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onManageSubscription })
   const [photoUrl, setPhotoUrl] = useState(user?.user_metadata?.avatar_url || `https://ui-avatars.com/api/?name=${user?.email}&background=8B5CF6&color=fff`);
   const [schoolName, setSchoolName] = useState(user?.user_metadata?.school || "Não vinculada");
 
-  const userType = user?.user_metadata?.user_type;
-  const isInstitution = userType === 'institution';
-  const isProfessor = userType === 'professor';
+  // PREFERE A ROLE PASSADA VIA PROP (Reparada no App.tsx), SENÃO TENTA METADATA
+  const userType = currentRole || user?.user_metadata?.user_type;
+
+  const isInstitution = userType === 'school_admin' || userType === 'institution'; // Aceita ambos
+  const isProfessor = userType === 'teacher' || userType === 'professor';
   const schoolId = user?.user_metadata?.school_id || null;
   const [classes, setClasses] = useState<ClassGroup[]>([]);
 
@@ -133,8 +136,8 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onManageSubscription })
               disabled={isSaving || isSuccess}
               onClick={handleSaveProfile}
               className={`px-6 py-2.5 rounded-xl font-bold shadow-lg flex items-center gap-2 transition-all disabled:opacity-80 disabled:cursor-not-allowed ${isSuccess
-                  ? "bg-emerald-500 text-white shadow-emerald-500/30 scale-105"
-                  : "bg-primary text-white shadow-primary/30 hover:bg-primary-dark active:scale-95"
+                ? "bg-emerald-500 text-white shadow-emerald-500/30 scale-105"
+                : "bg-primary text-white shadow-primary/30 hover:bg-primary-dark active:scale-95"
                 }`}
             >
               {isSaving ? (

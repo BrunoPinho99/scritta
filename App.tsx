@@ -333,7 +333,7 @@ const App: React.FC = () => {
         case 'inst-classes': return <InstitutionDashboard initialTab="classes" userType={type} />;
         case 'inst-staff': return <InstitutionDashboard initialTab="staff" userType={type} />;
         case 'inst-settings': return <InstitutionDashboard initialTab="settings" userType={type} />;
-        case 'profile': return <ProfileView onManageSubscription={() => { }} />;
+        case 'profile': return <ProfileView user={session?.user} currentRole={userType} onManageSubscription={() => { }} />;
         case 'notifications': return (
           <NotificationsView
             notifications={notifications}
@@ -413,7 +413,7 @@ const App: React.FC = () => {
           onClose={() => setCurrentView('practice')}
         />
       );
-      case 'profile': return <ProfileView />;
+      case 'profile': return <ProfileView user={session?.user} currentRole={userType} />;
       default: return <div className="py-20 text-center">Carregando...</div>;
     }
   };
