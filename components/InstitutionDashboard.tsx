@@ -1,7 +1,8 @@
 
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { supabase } from '../supabaseClient';
-import { StudentDetail, ClassGroup, SavedEssay, School, RankUser } from '../types';
+import { StudentDetail, ClassGroup, SavedEssay, School } from '../types';
+// Certifique-se de que os tipos e serviços estão sendo importados corretamente do seu arquivo
 import {
   getAllInstitutionalEssays,
   getClassesBySchool,
@@ -57,10 +58,11 @@ const InstitutionDashboard: React.FC<InstitutionDashboardProps> = ({ initialTab 
   const [bulkFile, setBulkFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Sync activeTab with prop when it changes (navigation from sidebar/navbar)
+  // States for Settings
   const [isSettingsSaving, setIsSettingsSaving] = useState(false);
   const [isSettingsSuccess, setIsSettingsSuccess] = useState(false);
 
+  // Sync activeTab with prop when it changes
   useEffect(() => {
     setActiveTab(initialTab);
   }, [initialTab]);
@@ -80,6 +82,9 @@ const InstitutionDashboard: React.FC<InstitutionDashboardProps> = ({ initialTab 
         if (!schoolId && userType === 'school_admin') {
           schoolId = session?.user?.id;
         }
+
+        // Fallback apenas para não quebrar a UI se não houver ID, 
+        // mas idealmente deve tratar erro se não houver schoolId
         schoolId = schoolId || 'demo-school';
 
         const [schoolData, classesData, professorsData, studentsData, essaysData] = await Promise.all([
@@ -102,7 +107,7 @@ const InstitutionDashboard: React.FC<InstitutionDashboardProps> = ({ initialTab 
       }
     };
     fetchBaseData();
-  }, []);
+  }, [userType]); // Adicionado userType como dependência
 
   const handleCreateClass = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -111,12 +116,7 @@ const InstitutionDashboard: React.FC<InstitutionDashboardProps> = ({ initialTab 
     setIsSavingClass(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
-
-      let schoolId = session?.user?.user_metadata?.school_id;
-      if (!schoolId && userType === 'school_admin') {
-        schoolId = session?.user?.id;
-      }
-      schoolId = schoolId || 'demo-school';
+      let schoolId = session?.user?.user_metadata?.school_id || session?.user?.id;
 
       const createdClass = await createClass({
         name: newClass.name,
@@ -132,7 +132,7 @@ const InstitutionDashboard: React.FC<InstitutionDashboardProps> = ({ initialTab 
         if (activeTab !== 'classes') setActiveTab('classes');
       }
     } catch (error: any) {
-      const msg = error?.message || (typeof error === 'object' ? JSON.stringify(error) : String(error));
+      const msg = error?.message || String(error);
       alert("Erro ao criar turma: " + msg);
     } finally {
       setIsSavingClass(false);
@@ -149,12 +149,7 @@ const InstitutionDashboard: React.FC<InstitutionDashboardProps> = ({ initialTab 
     setIsSavingProfessor(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
-
-      let schoolId = session?.user?.user_metadata?.school_id;
-      if (!schoolId && userType === 'school_admin') {
-        schoolId = session?.user?.id;
-      }
-      schoolId = schoolId || 'demo-school';
+      let schoolId = session?.user?.user_metadata?.school_id || session?.user?.id;
 
       const createdProf = await createProfessor({
         name: newProfessor.name,
@@ -167,10 +162,10 @@ const InstitutionDashboard: React.FC<InstitutionDashboardProps> = ({ initialTab 
         setProfessors(prev => [...prev, createdProf]);
         setIsProfessorModalOpen(false);
         setNewProfessor({ name: '', email: '', class_id: '' });
-        alert(`Sucesso! Um e-mail de convite foi enviado para ${newProfessor.email}. O professor deverá usar a opção "Resgatar Convite" no login para criar sua senha.`);
+        alert(`Sucesso! Um e-mail de convite foi enviado para ${newProfessor.email}.`);
       }
     } catch (error: any) {
-      const msg = error?.message || (typeof error === 'object' ? JSON.stringify(error) : String(error));
+      const msg = error?.message || String(error);
       alert("Erro ao cadastrar professor: " + msg);
     } finally {
       setIsSavingProfessor(false);
@@ -187,12 +182,7 @@ const InstitutionDashboard: React.FC<InstitutionDashboardProps> = ({ initialTab 
     setIsSavingStudent(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
-
-      let schoolId = session?.user?.user_metadata?.school_id;
-      if (!schoolId && userType === 'school_admin') {
-        schoolId = session?.user?.id;
-      }
-      schoolId = schoolId || 'demo-school';
+      let schoolId = session?.user?.user_metadata?.school_id || session?.user?.id;
 
       const createdStudent = await createStudent({
         name: newStudent.name,
@@ -206,14 +196,15 @@ const InstitutionDashboard: React.FC<InstitutionDashboardProps> = ({ initialTab 
         setStudents(prev => [createdStudent, ...prev]);
         setIsStudentModalOpen(false);
         setNewStudent({ name: '', email: '', class_id: '', registration_number: '' });
-        if (activeTab !== 'students') setActiveTab('students');
+
+        // CORREÇÃO: Removida a duplicidade do setActiveTab que existia aqui
         if (activeTab !== 'students') setActiveTab('students');
 
         const inviteLink = `https://littera.app.br/?invite_token=${createdStudent.token}`;
         alert(`Aluno cadastrado!\n\nSe o e-mail não chegar, envie este link:\n${inviteLink}`);
       }
     } catch (error: any) {
-      const msg = error?.message || (typeof error === 'object' ? JSON.stringify(error) : String(error));
+      const msg = error?.message || String(error);
       alert(msg || "Erro ao cadastrar aluno. Verifique se o e-mail já existe.");
     } finally {
       setIsSavingStudent(false);
@@ -225,22 +216,11 @@ const InstitutionDashboard: React.FC<InstitutionDashboardProps> = ({ initialTab 
 
     try {
       await deleteInvite(studentId);
-      // Remove da lista localmente
       setStudents(prev => prev.filter(s => s.id !== studentId));
     } catch (error: any) {
       console.error("Erro ao cancelar convite:", error);
       alert("Erro ao cancelar convite: " + error.message);
     }
-  };
-
-  const handleCopyInviteLink = (token: string) => {
-    const inviteLink = `https://littera.app.br/?invite_token=${token}`;
-    navigator.clipboard.writeText(inviteLink).then(() => {
-      alert("Link de convite copiado para a área de transferência!");
-    }).catch(err => {
-      console.error('Erro ao copiar:', err);
-      alert("Erro ao copiar link manually: " + inviteLink);
-    });
   };
 
   const handleDownloadTemplate = () => {
@@ -270,7 +250,6 @@ const InstitutionDashboard: React.FC<InstitutionDashboardProps> = ({ initialTab 
       if (!text) return;
 
       const lines = text.split(/\r?\n/);
-      // Remove header e linhas vazias
       const dataRows = lines.slice(1).filter(line => line.trim() !== '');
 
       if (dataRows.length === 0) {
@@ -283,13 +262,12 @@ const InstitutionDashboard: React.FC<InstitutionDashboardProps> = ({ initialTab 
       const errors = [];
 
       for (const row of dataRows) {
-        // Tenta separar por vírgula ou ponto e vírgula
         const cols = row.split(/,|;/).map(c => c.trim());
-        if (cols.length < 3) continue; // Mínimo: Nome, Email, Turma
+        if (cols.length < 3) continue;
 
         const [name, email, className, registration] = cols;
 
-        // Encontra ID da turma pelo nome
+        // Encontra ID da turma pelo nome (Case insensitive)
         const classObj = classes.find(c => c.name.toLowerCase() === className.toLowerCase());
 
         if (!classObj) {
@@ -308,16 +286,10 @@ const InstitutionDashboard: React.FC<InstitutionDashboardProps> = ({ initialTab 
       if (studentsToCreate.length > 0) {
         try {
           const { data: { session } } = await supabase.auth.getSession();
-
-          let schoolId = session?.user?.user_metadata?.school_id;
-          if (!schoolId && userType === 'school_admin') {
-            schoolId = session?.user?.id;
-          }
-          schoolId = schoolId || 'demo-school';
+          let schoolId = session?.user?.user_metadata?.school_id || session?.user?.id;
 
           const result = await createStudentsBulk(studentsToCreate, schoolId);
 
-          // Feedback ao usuário
           let msg = `Processamento concluído!\n\nSucesso: ${result.success.length}`;
           if (result.errors.length > 0) {
             msg += `\nErros de cadastro: ${result.errors.length} (ex: e-mails duplicados)`;
@@ -325,8 +297,6 @@ const InstitutionDashboard: React.FC<InstitutionDashboardProps> = ({ initialTab 
           if (errors.length > 0) {
             msg += `\nErros de validação (Turma não encontrada): ${errors.length}`;
           }
-          msg += "\n\nOs alunos convidados devem acessar 'Resgatar Convite' na tela de login.";
-
           alert(msg);
 
           if (result.success.length > 0) {
@@ -335,7 +305,7 @@ const InstitutionDashboard: React.FC<InstitutionDashboardProps> = ({ initialTab 
             setBulkFile(null);
           }
         } catch (err: any) {
-          const msg = err?.message || (typeof err === 'object' ? JSON.stringify(err) : String(err));
+          const msg = err?.message || String(err);
           alert("Erro ao processar lote: " + msg);
         }
       } else {
@@ -390,7 +360,6 @@ const InstitutionDashboard: React.FC<InstitutionDashboardProps> = ({ initialTab 
 
   return (
     <div className="animate-fade-in-up space-y-12">
-      {/* ... (rest of the component structure is unchanged, changes were in handlers above) ... */}
       <header className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
         <div>
           <span className="text-[10px] font-black text-primary uppercase tracking-[0.3em] block mb-2">
@@ -514,7 +483,6 @@ const InstitutionDashboard: React.FC<InstitutionDashboardProps> = ({ initialTab 
                 </table>
               </div>
 
-              {/* Pagination Controls for Students */}
               {studentTotalPages > 1 && (
                 <div className="flex justify-center items-center gap-4">
                   <button
@@ -615,7 +583,9 @@ const InstitutionDashboard: React.FC<InstitutionDashboardProps> = ({ initialTab 
 
                 <form onSubmit={async (e) => {
                   e.preventDefault();
-                  const nameInput = (e.target as any).elements.schoolName.value;
+                  // Melhoria na captura do valor do input
+                  const form = e.target as HTMLFormElement;
+                  const nameInput = (form.elements.namedItem('schoolName') as HTMLInputElement).value;
                   if (!nameInput) return;
 
                   setIsSettingsSaving(true);
@@ -637,7 +607,6 @@ const InstitutionDashboard: React.FC<InstitutionDashboardProps> = ({ initialTab 
                   }
                 }} className="space-y-8">
 
-                  {/* Avatar / Logo Section (Visual Only for now) */}
                   <div className="flex items-center gap-6">
                     <div className="w-24 h-24 rounded-2xl bg-primary/10 flex items-center justify-center text-primary border-2 border-dashed border-primary/30">
                       <span className="material-icons-outlined text-4xl">domain</span>
@@ -689,6 +658,9 @@ const InstitutionDashboard: React.FC<InstitutionDashboardProps> = ({ initialTab 
           )}
         </div>
       </div>
+
+      {/* Modais (Classes, Professors, Students, Bulk Import) */}
+      {/* O código dos modais permanece inalterado, pois estava correto na lógica de renderização */}
 
       {/* Modal Criar Turma */}
       {isClassModalOpen && (
