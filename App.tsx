@@ -20,7 +20,7 @@ import { exploreTopics } from './data/exploreTopics';
 
 // Services
 import { correctEssay } from './services/geminiService';
-import { saveEssayToDatabase, getNotifications, markNotificationAsRead, markAllNotificationsAsRead } from './services/databaseService'; // Certifique-se que o arquivo se chama databaseService.ts (singular)
+import { saveEssayToDatabase, getNotifications, markNotificationAsRead, markAllNotificationsAsRead, clearAllNotifications } from './services/databaseService'; // Certifique-se que o arquivo se chama databaseService.ts (singular)
 import { supabase } from './services/supabase'; // Caminho corrigido para services/supabase.ts
 
 const INITIAL_INDEX = Math.floor(Math.random() * exploreTopics.length);
@@ -285,6 +285,15 @@ const App: React.FC = () => {
     }
   };
 
+  const handleClearAllNotifications = async () => {
+    if (session?.user?.id) {
+      if (confirm('Tem certeza que deseja apagar todas as notificações?')) {
+        await clearAllNotifications(session.user.id);
+        setNotifications([]);
+      }
+    }
+  };
+
   const renderView = () => {
     if (userType === 'school_admin' || userType === 'teacher') {
       const type = userType as 'teacher' | 'school_admin';
@@ -301,6 +310,7 @@ const App: React.FC = () => {
             notifications={notifications}
             onMarkAsRead={handleMarkAsRead}
             onMarkAllAsRead={handleMarkAllAsRead}
+            onClearAll={handleClearAllNotifications}
             onClose={() => setCurrentView(getDefaultView(type))}
           />
         );
@@ -370,6 +380,7 @@ const App: React.FC = () => {
           notifications={notifications}
           onMarkAsRead={handleMarkAsRead}
           onMarkAllAsRead={handleMarkAllAsRead}
+          onClearAll={handleClearAllNotifications}
           onClose={() => setCurrentView('practice')}
         />
       );

@@ -463,17 +463,6 @@ export const deleteInvite = async (inviteId: string) => {
     .eq('id', inviteId);
 
   if (error) throw error;
-
-  // Gerar Notificação Automática
-  if (userId && userId !== 'demo') {
-    const score = essayData.result.totalScore;
-    await createNotification(
-      userId,
-      'correction',
-      'Redação Corrigida',
-      `Sua redação sobre "${topicTitle}" foi corrigida. Nota: ${score}.`
-    );
-  }
 };
 
 // ==========================================
@@ -537,4 +526,13 @@ export const markAllNotificationsAsRead = async (userId: string) => {
     .eq('user_id', userId);
 
   if (error) console.error("Erro ao marcar todas como lidas:", error);
+};
+
+export const clearAllNotifications = async (userId: string) => {
+  const { error } = await supabase
+    .from('notifications')
+    .delete()
+    .eq('user_id', userId);
+
+  if (error) console.error("Erro ao limpar notificações:", error);
 };
