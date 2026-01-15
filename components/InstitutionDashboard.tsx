@@ -58,6 +58,9 @@ const InstitutionDashboard: React.FC<InstitutionDashboardProps> = ({ initialTab 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Sync activeTab with prop when it changes (navigation from sidebar/navbar)
+  const [isSettingsSaving, setIsSettingsSaving] = useState(false);
+  const [isSettingsSuccess, setIsSettingsSuccess] = useState(false);
+
   useEffect(() => {
     setActiveTab(initialTab);
   }, [initialTab]);
@@ -664,8 +667,8 @@ const InstitutionDashboard: React.FC<InstitutionDashboardProps> = ({ initialTab 
                       type="submit"
                       disabled={isSettingsSaving || isSettingsSuccess}
                       className={`px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg transition-all flex items-center gap-2 ${isSettingsSuccess
-                          ? "bg-emerald-500 text-white shadow-emerald-500/20 scale-105"
-                          : "bg-primary text-white shadow-primary/20 hover:scale-105 active:scale-95"
+                        ? "bg-emerald-500 text-white shadow-emerald-500/20 scale-105"
+                        : "bg-primary text-white shadow-primary/20 hover:scale-105 active:scale-95"
                         }`}
                     >
                       {isSettingsSaving ? (
