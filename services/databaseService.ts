@@ -36,6 +36,63 @@ export const getSchoolData = async (userId: string): Promise<School | null> => {
   return null;
 };
 
+export const updateSchoolProfile = async (userId: string, name: string) => {
+  const { error } = await supabase
+    .from('profiles')
+    .update({ school_name: name })
+    .eq('id', userId);
+
+  if (error) throw error;
+  return true;
+  if (error) throw error;
+  return true;
+};
+
+export const uploadAvatar = async (file: File): Promise<string> => {
+  const fileExt = file.name.split('.').pop();
+  const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`;
+  const filePath = `${fileName}`;
+
+  // Tenta fazer upload para o bucket 'avatars'
+  // Nota: O bucket deve estar criado e com políticas de acesso "public"
+  const { error: uploadError } = await supabase.storage
+    .from('avatars')
+    .upload(filePath, file);
+
+  if (uploadError) {
+    console.error("Erro no upload:", uploadError);
+    throw new Error("Falha ao enviar imagem. Verifique se o bucket 'avatars' existe.");
+  }
+
+  const { data } = supabase.storage.from('avatars').getPublicUrl(filePath);
+  return data.publicUrl;
+};
+
+export const updateUserProfile = async (userId: string, payload: { full_name?: string, avatar_url?: string, school_name?: string }) => {
+  // 1. Atualiza tabela profiles (Fonte de verdade)
+  const updates: any = { updated_at: new Date().toISOString() };
+  if (payload.full_name !== undefined) updates.full_name = payload.full_name;
+  if (payload.avatar_url !== undefined) updates.avatar_url = payload.avatar_url;
+  if (payload.school_name !== undefined) updates.school_name = payload.school_name;
+
+  const { error } = await supabase
+    .from('profiles')
+    .update(updates)
+    .eq('id', userId);
+
+  if (error) throw error;
+
+  // 2. Atualiza Metadata da Sessão (Cache rápido)
+  // Isso mantém a sessão sincronizada sem precisar de refresh
+  const { error: authError } = await supabase.auth.updateUser({
+    data: payload
+  });
+
+  if (authError) console.warn("Aviso: Metadata de auth não atualizado:", authError);
+
+  return true;
+};
+
 export const getClassesBySchool = async (schoolId: string): Promise<ClassGroup[]> => {
   // Busca turmas criadas por esta escola
   const { data, error } = await supabase
@@ -463,6 +520,49 @@ export const deleteInvite = async (inviteId: string) => {
     .eq('id', inviteId);
 
   if (error) throw error;
+  if (error) throw error;
+};
+
+export const acceptInvite = async (token: string, userId: string) => {
+  // 1. Busca o convite pelo token
+  const { data: invite, error: fetchError } = await supabase
+    .from('invites')
+    .select('*')
+    .eq('token', token)
+    .single();
+
+  if (fetchError || !invite) {
+    console.error("Convite inválido ou não encontrado:", fetchError);
+    return false;
+  }
+
+  // 2. Adiciona o usuário à turma (class_members)
+  const { error: insertError } = await supabase
+    .from('class_members')
+    .insert({
+      school_id: invite.school_id,
+      class_id: invite.class_id,
+      user_id: userId,
+      role: invite.role
+    });
+
+  if (insertError) {
+    // Se der erro de duplicidade, provavelmente já foi aceito, então podemos seguir
+    if (!insertError.message.includes('unique')) {
+      console.error("Erro ao aceitar convite:", insertError);
+      throw insertError;
+    }
+  }
+
+  // 3. Atualiza status do convite ou deleta (Optando por deletar para limpar pendências)
+  const { error: deleteError } = await supabase
+    .from('invites')
+    .delete()
+    .eq('id', invite.id);
+
+  if (deleteError) console.error("Erro ao limpar convite:", deleteError);
+
+  return true;
 };
 
 // ==========================================

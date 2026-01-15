@@ -20,7 +20,7 @@ import { exploreTopics } from './data/exploreTopics';
 
 // Services
 import { correctEssay } from './services/geminiService';
-import { saveEssayToDatabase, getNotifications, markNotificationAsRead, markAllNotificationsAsRead, clearAllNotifications } from './services/databaseService'; // Certifique-se que o arquivo se chama databaseService.ts (singular)
+import { saveEssayToDatabase, getNotifications, markNotificationAsRead, markAllNotificationsAsRead, clearAllNotifications, acceptInvite } from './services/databaseService'; // Certifique-se que o arquivo se chama databaseService.ts (singular)
 import { supabase } from './services/supabase'; // Caminho corrigido para services/supabase.ts
 
 const INITIAL_INDEX = Math.floor(Math.random() * exploreTopics.length);
@@ -69,35 +69,36 @@ const App: React.FC = () => {
   };
 
   // Recuperação de Sessão
-  // Inicialização: Forçar Logout e Limpeza
   useEffect(() => {
-    const initApp = async () => {
-      try {
-        await supabase.auth.signOut();
-      } catch (e) {
-        console.error("Erro ao desconectar:", e);
-      } finally {
-        // Limpeza de tokens e dados locais
-        localStorage.removeItem('sb-xfmztntqxhbrxvwswys-auth-token');
-        localStorage.removeItem('sb-exvwyiwiagpzoohtjyhh-auth-token');
-        localStorage.removeItem('active_writing_session');
-        localStorage.removeItem('scritta_demo_mode');
-        localStorage.removeItem('scritta_demo_type');
-
-        setSession(null);
-        setIsDemoMode(false);
+    // 1. Verificar sessão inicial
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) {
         setIsInitializing(false);
       }
-    };
+      // Se houver sessão, o onAuthStateChange vai lidar
+    });
 
-    initApp();
-
+    // 2. Escutar mudanças de estado (Login, Logout, Inicialização com Sessão)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (session) {
         setSession(session);
-        setIsCheckingRole(true); // Inicia verificação de role
+        // Só mostra loading de role se for uma nova sessão/refresh, não em navegação
+        if (!userType || userType === 'student') setIsCheckingRole(true);
 
-        // Busca a role real do banco para garantir segurança e redirecionamento correto
+        // --- VERIFICAÇÃO DE CONVITE (INVITE TOKEN) ---
+        const inviteToken = session.user?.user_metadata?.invite_token;
+        if (inviteToken) {
+          // Tenta aceitar o convite silenciosamente
+          acceptInvite(inviteToken, session.user.id)
+            .then(success => {
+              if (success) {
+                console.log("Convite aceito automaticamente!");
+              }
+            })
+            .catch(err => console.error("Falha ao processar convite:", err));
+        }
+
+        // Busca a role real do banco
         let finalType: UserType = 'student';
 
         try {
@@ -113,25 +114,53 @@ const App: React.FC = () => {
           else if (dbRole === 'teacher') finalType = 'teacher';
           else if (dbRole === 'student') finalType = 'student';
           else {
-            // Fallback
+            // Se não achou na tabela profiles, tenta metadata ou assume student
             finalType = (session.user?.user_metadata?.user_type as UserType) || 'student';
           }
+
+          // Debug para verificar o que está chegando
+          console.log("[App] Role detection:", { userId: session.user.id, dbRole, metaRole: session.user?.user_metadata?.user_type, finalType });
         } catch (error) {
           console.error("Erro ao buscar role:", error);
           finalType = (session.user?.user_metadata?.user_type as UserType) || 'student';
         } finally {
           setUserType(finalType);
-          setIsCheckingRole(false); // Finaliza verificação
+          setIsCheckingRole(false);
+          setIsInitializing(false); // Sistema pronto
 
+          // Redirecionamento inteligente: Só redireciona se não estiver em uma sessão de escrita
           if (!hasActiveSessionRef.current && currentViewRef.current !== 'writing') {
-            setCurrentView(getDefaultView(finalType));
+            // Se já estiver na view correta, não muda (evita flash)
+            const defaultView = getDefaultView(finalType);
+            if (currentViewRef.current === 'practice' && defaultView !== 'practice') {
+              setCurrentView(defaultView);
+            } else if (currentViewRef.current !== defaultView) {
+              // Validação extra: Se for admin/prof em view de aluno (que não seja compartilhada), força default
+              // Como currentView reseta para 'practice' no refresh, o if acima captura.
+              // Mas se no futuro persistirmos view, isso garante:
+              if ((finalType === 'school_admin' || finalType === 'teacher')) {
+                // Se não for view de instituição nem perfil/notificações -> redireciona
+                if (!currentViewRef.current.startsWith('inst-') &&
+                  currentViewRef.current !== 'profile' &&
+                  currentViewRef.current !== 'notifications') {
+                  setCurrentView(defaultView);
+                }
+              }
+            }
           }
         }
       } else {
+        // Logout ou Sem Sessão
         setSession(null);
         setIsCheckingRole(false);
-        // Não reseta Demo Mode aqui automaticamente para evitar loop se fosse o caso, 
-        // mas initApp já cuidou da limpeza inicial.
+        // Apenas desliga loading se NÃO estivermos entrando em modo demo
+        // (Modo demo seta isDemoMode=true antes de chegar aqui se for manual? Não, aqui é auth change)
+
+        // Verifica se é um logout manual ou apenas init sem sessão
+        const isDemo = localStorage.getItem('scritta_demo_mode') === 'true';
+        if (!isDemo) {
+          setIsInitializing(false);
+        }
       }
     });
 

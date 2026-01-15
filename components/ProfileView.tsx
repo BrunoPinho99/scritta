@@ -1,7 +1,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
-import { getClassesBySchool } from '../services/databaseService';
+import { getClassesBySchool, updateUserProfile, uploadAvatar } from '../services/databaseService';
 import { ClassGroup } from '../types';
 
 interface ProfileViewProps {
@@ -12,6 +12,9 @@ interface ProfileViewProps {
 const ProfileView: React.FC<ProfileViewProps> = ({ user, onManageSubscription }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
+
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   const [fullName, setFullName] = useState(user?.user_metadata?.full_name || "");
   const [photoUrl, setPhotoUrl] = useState(user?.user_metadata?.avatar_url || `https://ui-avatars.com/api/?name=${user?.email}&background=8B5CF6&color=fff`);
@@ -38,12 +41,7 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onManageSubscription })
     }
   };
 
-  const handleResetSystem = () => {
-    if (confirm("Deseja realmente zerar todos os dados locais (tarefas e notificações)? Isso não afetará o banco de dados principal, apenas o cache deste navegador.")) {
-      localStorage.clear();
-      window.location.reload();
-    }
-  };
+
 
   const handleEdit = () => setIsEditing(true);
 
@@ -51,13 +49,18 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onManageSubscription })
     setFullName(user?.user_metadata?.full_name || "");
     setPhotoUrl(user?.user_metadata?.avatar_url || `https://ui-avatars.com/api/?name=${user?.email}&background=8B5CF6&color=fff`);
     setSchoolName(user?.user_metadata?.school || "Não vinculada");
+    setSelectedFile(null);
     setIsEditing(false);
   };
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      if (file.size > 2 * 1024 * 1024) { alert("A imagem deve ter no máximo 2MB."); return; }
+      if (file.size > 5 * 1024 * 1024) { alert("A imagem deve ter no máximo 5MB."); return; } // Aumentei para 5MB
+
+      setSelectedFile(file);
+
+      // Preview apenas
       const reader = new FileReader();
       reader.onloadend = () => setPhotoUrl(reader.result as string);
       reader.readAsDataURL(file);
@@ -65,16 +68,35 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onManageSubscription })
   };
 
   const handleSaveProfile = async () => {
+    if (!user?.id) return;
     setIsSaving(true);
     try {
-      const { error } = await supabase.auth.updateUser({
-        data: { full_name: fullName, school: schoolName, avatar_url: photoUrl }
+      let finalAvatarUrl = photoUrl;
+
+      // 1. Upload da Imagem (se houve alteração)
+      if (selectedFile) {
+        finalAvatarUrl = await uploadAvatar(selectedFile);
+      }
+
+      // 2. Atualizar Perfil no Banco e na Sessão
+      await updateUserProfile(user.id, {
+        full_name: fullName,
+        school_name: schoolName, // Se for Instituição
+        avatar_url: finalAvatarUrl
       });
-      if (error) throw error;
-      setIsEditing(false);
+
+      // Atualiza estado local para refletir a URL final (não o base64 do preview)
+      setPhotoUrl(finalAvatarUrl);
+      setSelectedFile(null);
+      // setIsEditing(false); // Mantém edição aberta para mostrar o botão de sucesso
+
+      setIsSuccess(true);
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
     } catch (error: any) {
-      // Garante que o erro seja exibido como string, mesmo se for um objeto, evitando [object Object]
       const msg = error?.message || (typeof error === 'object' ? JSON.stringify(error) : String(error));
+      console.error(error);
       alert("Erro ao salvar perfil: " + msg);
     } finally {
       setIsSaving(false);
@@ -96,12 +118,7 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onManageSubscription })
         </div>
         {!isEditing ? (
           <div className="flex gap-3">
-            <button
-              onClick={handleResetSystem}
-              className="flex items-center gap-2 px-6 py-2.5 bg-rose-50 text-rose-600 border border-rose-100 rounded-xl font-bold hover:bg-rose-100 transition-all active:scale-95"
-            >
-              <span className="material-icons-outlined text-[20px]">delete_sweep</span> Zerar Cache
-            </button>
+
             <button
               onClick={handleEdit}
               className="flex items-center gap-2 px-6 py-2.5 bg-primary text-white rounded-xl font-bold shadow-lg shadow-primary/30 hover:bg-primary-dark transition-all active:scale-95"
@@ -113,11 +130,23 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onManageSubscription })
           <div className="flex gap-3">
             <button onClick={handleCancel} className="px-6 py-2.5 bg-gray-200 dark:bg-slate-700 text-gray-700 dark:text-gray-300 rounded-xl font-bold transition-colors">Cancelar</button>
             <button
-              disabled={isSaving}
+              disabled={isSaving || isSuccess}
               onClick={handleSaveProfile}
-              className="px-6 py-2.5 bg-primary text-white rounded-xl font-bold shadow-lg flex items-center gap-2 transition-all hover:bg-primary-dark disabled:opacity-50"
+              className={`px-6 py-2.5 rounded-xl font-bold shadow-lg flex items-center gap-2 transition-all disabled:opacity-80 disabled:cursor-not-allowed ${isSuccess
+                  ? "bg-emerald-500 text-white shadow-emerald-500/30 scale-105"
+                  : "bg-primary text-white shadow-primary/30 hover:bg-primary-dark active:scale-95"
+                }`}
             >
-              {isSaving ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : "Salvar Alterações"}
+              {isSaving ? (
+                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+              ) : isSuccess ? (
+                <>
+                  <span className="material-icons-outlined animate-bounce">check</span>
+                  Perfil salvo com sucesso!
+                </>
+              ) : (
+                "Salvar Alterações"
+              )}
             </button>
           </div>
         )}

@@ -12,7 +12,8 @@ import {
   createProfessor,
   createStudent,
   createStudentsBulk,
-  deleteInvite
+  deleteInvite,
+  updateSchoolProfile
 } from '../services/databaseService';
 import RankingView from './RankingView';
 
@@ -369,6 +370,7 @@ const InstitutionDashboard: React.FC<InstitutionDashboardProps> = ({ initialTab 
 
     if (userType === 'school_admin') {
       baseTabs.splice(1, 0, { id: 'classes', label: 'Turmas', icon: 'grid_view' });
+      baseTabs.push({ id: 'settings', label: 'Configurações', icon: 'settings' });
     }
 
     return baseTabs;
@@ -598,6 +600,88 @@ const InstitutionDashboard: React.FC<InstitutionDashboardProps> = ({ initialTab 
                   <p>Nenhuma redação corrigida encontrada no sistema.</p>
                 </div>
               )}
+            </div>
+          )}
+          {activeTab === 'settings' && school && (
+            <div className="max-w-2xl mx-auto">
+              <div className="bg-white dark:bg-surface-dark p-8 rounded-[2.5rem] shadow-sm border border-gray-100 dark:border-white/5">
+                <div className="mb-8">
+                  <h3 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight">Configurações da Instituição</h3>
+                  <p className="text-gray-500 text-sm mt-1 font-medium">Gerencie as informações públicas da sua escola.</p>
+                </div>
+
+                <form onSubmit={async (e) => {
+                  e.preventDefault();
+                  const nameInput = (e.target as any).elements.schoolName.value;
+                  if (!nameInput) return;
+
+                  setIsSettingsSaving(true);
+                  try {
+                    const { data: { session } } = await supabase.auth.getSession();
+                    if (session?.user?.id) {
+                      await updateSchoolProfile(session.user.id, nameInput);
+                      setSchool(prev => prev ? { ...prev, name: nameInput } : null);
+
+                      setIsSettingsSuccess(true);
+                      setTimeout(() => {
+                        window.location.reload();
+                      }, 1000);
+                    }
+                  } catch (err: any) {
+                    alert("Erro ao atualizar: " + err.message);
+                  } finally {
+                    setIsSettingsSaving(false);
+                  }
+                }} className="space-y-8">
+
+                  {/* Avatar / Logo Section (Visual Only for now) */}
+                  <div className="flex items-center gap-6">
+                    <div className="w-24 h-24 rounded-2xl bg-primary/10 flex items-center justify-center text-primary border-2 border-dashed border-primary/30">
+                      <span className="material-icons-outlined text-4xl">domain</span>
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-gray-900 dark:text-white mb-1">Logo da Escola</p>
+                      <p className="text-xs text-gray-400 mb-3">Recomendado: 400x400px</p>
+                      <button type="button" disabled className="px-4 py-2 bg-gray-100 dark:bg-white/5 rounded-xl text-xs font-bold text-gray-400 cursor-not-allowed">
+                        Alterar Foto (Em breve)
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Nome Oficial da Escola</label>
+                    <input
+                      name="schoolName"
+                      defaultValue={school.name}
+                      type="text"
+                      className="w-full px-6 py-4 rounded-2xl bg-gray-50 dark:bg-white/5 border border-transparent focus:border-primary/30 focus:bg-white dark:focus:bg-white/10 outline-none font-bold text-lg transition-all text-gray-900 dark:text-white"
+                      placeholder="Ex: Colégio Scritta"
+                    />
+                  </div>
+
+                  <div className="pt-4 border-t border-gray-50 dark:border-white/5 flex justify-end">
+                    <button
+                      type="submit"
+                      disabled={isSettingsSaving || isSettingsSuccess}
+                      className={`px-8 py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg transition-all flex items-center gap-2 ${isSettingsSuccess
+                          ? "bg-emerald-500 text-white shadow-emerald-500/20 scale-105"
+                          : "bg-primary text-white shadow-primary/20 hover:scale-105 active:scale-95"
+                        }`}
+                    >
+                      {isSettingsSaving ? (
+                        <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                      ) : isSettingsSuccess ? (
+                        <>
+                          <span className="material-icons-outlined text-lg animate-bounce">check</span>
+                          Salvo com Sucesso!
+                        </>
+                      ) : (
+                        "Salvar Alterações"
+                      )}
+                    </button>
+                  </div>
+                </form>
+              </div>
             </div>
           )}
         </div>
