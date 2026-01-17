@@ -114,15 +114,21 @@ const App: React.FC = () => {
           else if (dbRole === 'teacher') finalType = 'teacher';
           else if (dbRole === 'student') finalType = 'student';
           else {
-            // Se não achou na tabela profiles, tenta metadata ou assume student
-            finalType = (session.user?.user_metadata?.user_type as UserType) || 'student';
+            // Se não achou na tabela profiles, tenta metadata
+            const metaRole = session.user?.user_metadata?.role || session.user?.user_metadata?.user_type;
+            if (metaRole === 'school') finalType = 'school_admin';
+            else if (metaRole === 'teacher') finalType = 'teacher';
+            else finalType = 'student';
           }
 
           // Debug para verificar o que está chegando
           console.log("[App] Role detection:", { userId: session.user.id, dbRole, metaRole: session.user?.user_metadata?.user_type, finalType });
         } catch (error) {
           console.error("Erro ao buscar role:", error);
-          finalType = (session.user?.user_metadata?.user_type as UserType) || 'student';
+          const metaRole = session.user?.user_metadata?.role || session.user?.user_metadata?.user_type;
+          if (metaRole === 'school') finalType = 'school_admin';
+          else if (metaRole === 'teacher') finalType = 'teacher';
+          else finalType = 'student';
         } finally {
           setUserType(finalType);
           setIsCheckingRole(false);
