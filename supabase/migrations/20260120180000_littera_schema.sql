@@ -67,14 +67,20 @@ ALTER TABLE public.assignments ENABLE ROW LEVEL SECURITY;
 -- 8. BASIC RLS POLICIES (Permissive for now for development, refine later)
 
 -- Schools: Viewable by everyone (for lookup), editable by admins (TODO)
+DROP POLICY IF EXISTS "Schools are viewable by everyone" ON public.schools;
 CREATE POLICY "Schools are viewable by everyone" ON public.schools FOR SELECT USING (true);
 
 -- Classes: Viewable by authenticated users
+DROP POLICY IF EXISTS "Classes viewable by auth" ON public.classes;
 CREATE POLICY "Classes viewable by auth" ON public.classes FOR SELECT TO authenticated USING (true);
+
+DROP POLICY IF EXISTS "Classes editable by auth" ON public.classes;
 CREATE POLICY "Classes editable by auth" ON public.classes FOR ALL TO authenticated USING (true); -- TODO: Lock down to School Admins
 
 -- Assignments: View/Edit by auth (TODO: Lock down)
+DROP POLICY IF EXISTS "Assignments generic" ON public.assignments;
 CREATE POLICY "Assignments generic" ON public.assignments FOR ALL TO authenticated USING (true);
 
 -- Class Members: View/Edit by auth
+DROP POLICY IF EXISTS "ClassMembers generic" ON public.class_members;
 CREATE POLICY "ClassMembers generic" ON public.class_members FOR ALL TO authenticated USING (true);
