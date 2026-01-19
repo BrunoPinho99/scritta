@@ -98,59 +98,53 @@ const App: React.FC = () => {
             .catch(err => console.error("Falha ao processar convite:", err));
         }
 
-        // Busca a role real do banco
+        // OTIMIZAÇÃO DE PERFORMANCE: Usa metadata da sessão para UI instantânea
+        // "Source of Truth" primária para renderização é a sessão local, não o banco.
+        const metaRole = session.user?.user_metadata?.role || session.user?.user_metadata?.user_type;
         let finalType: UserType = 'student';
 
-        try {
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('role')
-            .eq('id', session.user.id)
-            .single();
+        if (metaRole === 'school') finalType = 'school_admin';
+        else if (metaRole === 'teacher') finalType = 'teacher';
+        else if (metaRole === 'student') finalType = 'student';
 
-          const dbRole = profile?.role;
+        // Aplica estado imediatamente
+        setUserType(finalType);
+        setIsCheckingRole(false);
+        setIsInitializing(false);
 
-          if (dbRole === 'school') finalType = 'school_admin';
-          else if (dbRole === 'teacher') finalType = 'teacher';
-          else if (dbRole === 'student') finalType = 'student';
-          else {
-            // Se não achou na tabela profiles, tenta metadata
-            const metaRole = session.user?.user_metadata?.role || session.user?.user_metadata?.user_type;
-            if (metaRole === 'school') finalType = 'school_admin';
-            else if (metaRole === 'teacher') finalType = 'teacher';
-            else finalType = 'student';
-          }
+        // Background Check: Valida com o banco apenas para garantir consistência (sem bloquear UI)
+        supabase.from('profiles').select('role').eq('id', session.user.id).single()
+          .then(({ data: profile }) => {
+            if (profile?.role) {
+              let dbType: UserType = 'student';
+              if (profile.role === 'school') dbType = 'school_admin';
+              else if (profile.role === 'teacher') dbType = 'teacher';
+              else dbType = 'student'; // ou mantém o que estava
 
-          // Debug para verificar o que está chegando
-          console.log("[App] Role detection:", { userId: session.user.id, dbRole, metaRole: session.user?.user_metadata?.user_type, finalType });
-        } catch (error) {
-          console.error("Erro ao buscar role:", error);
-          const metaRole = session.user?.user_metadata?.role || session.user?.user_metadata?.user_type;
-          if (metaRole === 'school') finalType = 'school_admin';
-          else if (metaRole === 'teacher') finalType = 'teacher';
-          else finalType = 'student';
-        } finally {
-          setUserType(finalType);
-          setIsCheckingRole(false);
-          setIsInitializing(false); // Sistema pronto
+              // Se houver divergência crítica, corrige silenciosamente
+              if (dbType !== finalType && profile.role) {
+                console.warn("[Auth] Correção de Role via Banco:", { atual: finalType, correta: dbType });
+                setUserType(dbType);
+              }
+            }
+          })
+          .catch(err => console.error("Erro background auth:", err));
 
-          // Redirecionamento inteligente: Só redireciona se não estiver em uma sessão de escrita
-          if (!hasActiveSessionRef.current && currentViewRef.current !== 'writing') {
-            // Se já estiver na view correta, não muda (evita flash)
-            const defaultView = getDefaultView(finalType);
-            if (currentViewRef.current === 'practice' && defaultView !== 'practice') {
-              setCurrentView(defaultView);
-            } else if (currentViewRef.current !== defaultView) {
-              // Validação extra: Se for admin/prof em view de aluno (que não seja compartilhada), força default
-              // Como currentView reseta para 'practice' no refresh, o if acima captura.
-              // Mas se no futuro persistirmos view, isso garante:
-              if ((finalType === 'school_admin' || finalType === 'teacher')) {
-                // Se não for view de instituição nem perfil/notificações -> redireciona
-                if (!currentViewRef.current.startsWith('inst-') &&
-                  currentViewRef.current !== 'profile' &&
-                  currentViewRef.current !== 'notifications') {
-                  setCurrentView(defaultView);
-                }
+
+        // Redirecionamento Inteligente (Instantâneo)
+        if (!hasActiveSessionRef.current && currentViewRef.current !== 'writing') {
+          // Se já estiver na view correta, não muda (evita flash)
+          const defaultView = getDefaultView(finalType);
+          if (currentViewRef.current === 'practice' && defaultView !== 'practice') {
+            setCurrentView(defaultView);
+          } else if (currentViewRef.current !== defaultView) {
+            // Validação extra: Se for admin/prof em view de aluno (que não seja compartilhada), força default
+            if ((finalType === 'school_admin' || finalType === 'teacher')) {
+              // Se não for view de instituição nem perfil/notificações -> redireciona
+              if (!currentViewRef.current.startsWith('inst-') &&
+                currentViewRef.current !== 'profile' &&
+                currentViewRef.current !== 'notifications') {
+                setCurrentView(defaultView);
               }
             }
           }
