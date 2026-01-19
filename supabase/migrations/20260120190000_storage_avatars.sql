@@ -7,7 +7,8 @@ VALUES ('avatars', 'avatars', true)
 ON CONFLICT (id) DO NOTHING;
 
 -- 2. Enable RLS on storage.objects (just in case it's not enabled)
-ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
+-- 2. Enable RLS on storage.objects (Skipped as it is usually enabled and requires ownership)
+-- ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
 
 -- 3. Drop existing policies to avoid conflicts if re-running
 DROP POLICY IF EXISTS "Public Access to Avatars" ON storage.objects;
