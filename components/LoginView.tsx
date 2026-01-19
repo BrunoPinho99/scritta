@@ -109,12 +109,12 @@ const LoginView: React.FC<LoginViewProps> = ({ onLoginSuccess, onEnterDemo }) =>
           <div className="flex items-center gap-4 mb-16 animate-fade-in">
             <div className="w-16 h-16 bg-white rounded-[1.5rem] flex items-center justify-center shadow-2xl">
               <div className="flex flex-col items-center translate-y-[2px]">
-                <span className="text-primary font-black text-4xl leading-none tracking-tighter">s</span>
+                <span className="text-primary font-black text-4xl leading-none tracking-tighter">L</span>
                 <div className="w-7 h-[6px] bg-primary mt-[1px] rounded-full"></div>
               </div>
             </div>
             <span className="font-black text-6xl tracking-tighter text-white">
-              scritta<span className="text-white/40">.</span>
+              littera<span className="text-white/40">.</span>
             </span>
           </div>
 

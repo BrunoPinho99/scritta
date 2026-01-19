@@ -25,7 +25,7 @@ const Navbar: React.FC<NavbarProps> = ({ currentView, onViewChange, onLogout, us
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 20);
     window.addEventListener('scroll', handleScroll);
-    
+
     // Carregar rank do usuário para o badge da Navbar apenas se for aluno
     if (user?.id && userType === 'student') {
       getUserStats(user.id).then(stats => {
@@ -37,7 +37,7 @@ const Navbar: React.FC<NavbarProps> = ({ currentView, onViewChange, onLogout, us
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) setIsMenuOpen(false);
     };
     document.addEventListener('mousedown', handleClickOutside);
-    
+
     return () => {
       window.removeEventListener('scroll', handleScroll);
       document.removeEventListener('mousedown', handleClickOutside);
@@ -85,26 +85,25 @@ const Navbar: React.FC<NavbarProps> = ({ currentView, onViewChange, onLogout, us
 
   return (
     <header className={`fixed w-full top-0 z-[100] transition-all duration-500 px-6 ${scrolled ? 'pt-4' : 'pt-6'}`}>
-      <div className={`max-w-[1400px] mx-auto transition-all duration-500 ${
-        scrolled 
-          ? 'bg-white/80 dark:bg-background-dark/80 backdrop-blur-xl shadow-premium border border-gray-100 dark:border-white/5 rounded-[2rem]' 
+      <div className={`max-w-[1400px] mx-auto transition-all duration-500 ${scrolled
+          ? 'bg-white/80 dark:bg-background-dark/80 backdrop-blur-xl shadow-premium border border-gray-100 dark:border-white/5 rounded-[2rem]'
           : 'bg-transparent'
-      }`}>
+        }`}>
         <nav className="h-20 flex items-center justify-between px-8">
-          
+
           {/* Logo Section */}
-          <div 
-            className="flex items-center gap-3 cursor-pointer shrink-0 group" 
+          <div
+            className="flex items-center gap-3 cursor-pointer shrink-0 group"
             onClick={handleLogoClick}
           >
             <div className="w-10 h-10 bg-white dark:bg-slate-900 rounded-xl flex items-center justify-center shadow-premium border border-gray-100 dark:border-white/5 group-hover:scale-105 transition-all duration-300">
-               <div className="flex flex-col items-center translate-y-[1.5px]">
-                 <span className="text-primary font-black text-2xl leading-none tracking-tighter">s</span>
-                 <div className="w-4 h-[3.5px] bg-primary mt-[1px] rounded-full"></div>
-               </div>
+              <div className="flex flex-col items-center translate-y-[1.5px]">
+                <span className="text-primary font-black text-2xl leading-none tracking-tighter">L</span>
+                <div className="w-4 h-[3.5px] bg-primary mt-[1px] rounded-full"></div>
+              </div>
             </div>
             <span className="font-black text-2xl tracking-tighter text-gray-900 dark:text-white transition-opacity">
-              scritta<span className="text-primary/40">.</span>
+              littera<span className="text-primary/40">.</span>
             </span>
           </div>
 
@@ -114,11 +113,10 @@ const Navbar: React.FC<NavbarProps> = ({ currentView, onViewChange, onLogout, us
               <button
                 key={item.id}
                 onClick={() => onViewChange(item.id)}
-                className={`flex items-center gap-2.5 px-5 py-2.5 rounded-xl text-sm font-black transition-all duration-300 ${
-                  currentView === item.id 
-                    ? 'bg-white dark:bg-slate-800 text-primary shadow-sm scale-100' 
+                className={`flex items-center gap-2.5 px-5 py-2.5 rounded-xl text-sm font-black transition-all duration-300 ${currentView === item.id
+                    ? 'bg-white dark:bg-slate-800 text-primary shadow-sm scale-100'
                     : 'text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-white/50 dark:hover:bg-white/10'
-                }`}
+                  }`}
               >
                 <span className={`material-icons-outlined text-xl transition-transform ${currentView === item.id ? 'scale-110' : ''}`}>
                   {item.icon}
@@ -131,7 +129,7 @@ const Navbar: React.FC<NavbarProps> = ({ currentView, onViewChange, onLogout, us
           {/* Right Section: User & Actions */}
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
-              <button 
+              <button
                 onClick={() => onViewChange('notifications')}
                 className={`w-11 h-11 flex items-center justify-center rounded-2xl transition-all relative group ${currentView === 'notifications' ? 'bg-primary text-white shadow-lg' : 'text-gray-400 hover:text-primary hover:bg-primary/5'}`}
               >
@@ -141,11 +139,11 @@ const Navbar: React.FC<NavbarProps> = ({ currentView, onViewChange, onLogout, us
                 )}
               </button>
             </div>
-            
+
             <div className="h-8 w-px bg-gray-100 dark:bg-white/5 hidden sm:block"></div>
-            
+
             <div className="relative" ref={menuRef}>
-              <button 
+              <button
                 onClick={() => setIsMenuOpen(!isMenuOpen)}
                 className="flex items-center gap-3 p-1.5 rounded-2xl transition-all hover:bg-gray-100/50 dark:hover:bg-white/5 group"
               >
@@ -175,14 +173,14 @@ const Navbar: React.FC<NavbarProps> = ({ currentView, onViewChange, onLogout, us
                     <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Logado como</p>
                     <p className="text-sm font-bold text-gray-900 dark:text-white truncate">{user?.email}</p>
                   </div>
-                  
+
                   <button onClick={() => { onViewChange('profile'); setIsMenuOpen(false); }} className="w-full px-6 py-3 text-left text-sm font-bold text-gray-600 dark:text-gray-300 hover:bg-primary/5 hover:text-primary flex items-center gap-4 transition-colors group">
                     <div className="w-8 h-8 rounded-lg bg-gray-50 dark:bg-white/5 flex items-center justify-center group-hover:bg-primary/10 transition-colors">
                       <span className="material-icons-outlined text-xl">person_outline</span>
                     </div>
                     Meu Perfil
                   </button>
-                  
+
                   {userType === 'student' && (
                     <button onClick={() => { onViewChange('performance'); setIsMenuOpen(false); }} className="w-full px-6 py-3 text-left text-sm font-bold text-gray-600 dark:text-gray-300 hover:bg-primary/5 hover:text-primary flex items-center gap-4 transition-colors group">
                       <div className="w-8 h-8 rounded-lg bg-gray-50 dark:bg-white/5 flex items-center justify-center group-hover:bg-primary/10 transition-colors">
@@ -193,7 +191,7 @@ const Navbar: React.FC<NavbarProps> = ({ currentView, onViewChange, onLogout, us
                   )}
 
                   <div className="h-px bg-gray-50 dark:bg-white/5 my-2 mx-4"></div>
-                  
+
                   <button onClick={onLogout} className="w-full px-6 py-3 text-left text-sm font-black text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/10 flex items-center gap-4 transition-colors group">
                     <div className="w-8 h-8 rounded-lg bg-rose-50 dark:bg-rose-900/20 flex items-center justify-center group-hover:bg-rose-100 transition-colors">
                       <span className="material-icons-outlined text-xl">logout</span>

@@ -52,9 +52,13 @@ export interface SavedEssay {
 export interface Assignment {
   id: string;
   title: string;
+  description?: string;
   class_id: string;
   due_date: string;
   created_at: string;
+  status?: 'active' | 'expired' | 'draft';
+  created_by?: string;
+  className?: string; // Enhanced via join
 }
 
 export interface RankUser {

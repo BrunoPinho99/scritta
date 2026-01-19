@@ -263,22 +263,36 @@ const App: React.FC = () => {
     } catch (error) {
       console.error("Erro ao sair do Supabase:", error);
     } finally {
-      // --- LIMPEZA LOCAL FORÇADA (Sempre executa) ---
+      // --- LIMPEZA LOCAL FORÇADA E ROBUSTA ---
 
-      // 1. Limpa tokens de autenticação (ID correto do seu projeto: xfmztntqxhbrxvwswys)
-      localStorage.removeItem('sb-xfmztntqxhbrxvwswys-auth-token');
+      // 1. Limpa TODOS os tokens do Supabase dinamicamente
+      // Isso resolve o problema de IDs de projeto incorretos hardcoded
+      Object.keys(localStorage).forEach(key => {
+        if (key.startsWith('sb-') && key.endsWith('-auth-token')) {
+          localStorage.removeItem(key);
+        }
+      });
 
-      // 2. Limpa dados de sessão e demo
+      // 2. Limpa dados de sessão e demo da aplicação
       localStorage.removeItem('active_writing_session');
       localStorage.removeItem('scritta_demo_mode');
       localStorage.removeItem('scritta_demo_type');
 
+      // Limpa rascunhos salvos também, opcionalmente
+      Object.keys(localStorage).forEach(key => {
+        if (key.startsWith('draft_')) {
+          localStorage.removeItem(key);
+        }
+      });
+
       // 3. Reseta estados React
       setSession(null);
       setIsDemoMode(false);
+      setUserType('student'); // Reseta para default seguro
 
       // 4. Recarrega a página para garantir estado zero
-      window.location.href = '/';
+      // Usamos replace para não permitir voltar
+      window.location.replace('/');
     }
   };
 
@@ -422,9 +436,9 @@ const App: React.FC = () => {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-background-light dark:bg-background-dark">
         <div className="w-16 h-16 bg-white dark:bg-slate-900 rounded-2xl flex items-center justify-center shadow-xl animate-pulse">
-          <span className="text-primary font-black text-4xl">s</span>
+          <span className="text-primary font-black text-4xl">L</span>
         </div>
-        <p className="mt-4 text-xs font-black uppercase tracking-[0.2em] text-gray-400">Iniciando Sistema...</p>
+        <p className="mt-4 text-xs font-black uppercase tracking-[0.2em] text-gray-400">Iniciando Littera...</p>
       </div>
     );
   }
@@ -485,7 +499,7 @@ const App: React.FC = () => {
       </main>
 
       <footer className="py-14 text-center opacity-30 text-[9px] font-black uppercase tracking-[0.4em]">
-        &copy; 2024 Scritta. Todos os direitos reservados.
+        &copy; 2026 Littera Education. Todos os direitos reservados.
       </footer>
     </div>
   );

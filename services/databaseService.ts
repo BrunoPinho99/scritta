@@ -513,6 +513,8 @@ export const createStudent = async (payload: { name: string, email: string, clas
   };
 };
 
+// ... (existing code top)
+
 export const deleteInvite = async (inviteId: string) => {
   const { error } = await supabase
     .from('invites')
@@ -520,8 +522,28 @@ export const deleteInvite = async (inviteId: string) => {
     .eq('id', inviteId);
 
   if (error) throw error;
+};
+
+export const deleteClass = async (classId: string) => {
+  const { error } = await supabase
+    .from('classes')
+    .delete()
+    .eq('id', classId);
+
   if (error) throw error;
 };
+
+export const removeMember = async (userId: string, classId?: string) => {
+  let query = supabase.from('class_members').delete().eq('user_id', userId);
+  
+  if (classId) {
+    query = query.eq('class_id', classId);
+  }
+
+  const { error } = await query;
+  if (error) throw error;
+};
+
 
 export const acceptInvite = async (token: string, userId: string) => {
   // 1. Busca o convite pelo token
@@ -537,24 +559,26 @@ export const acceptInvite = async (token: string, userId: string) => {
   }
 
   // 2. Adiciona o usuário à turma (class_members)
+  // school_id removido pois é normalizado via classes
   const { error: insertError } = await supabase
     .from('class_members')
     .insert({
-      school_id: invite.school_id,
       class_id: invite.class_id,
       user_id: userId,
       role: invite.role
     });
 
   if (insertError) {
-    // Se der erro de duplicidade, provavelmente já foi aceito, então podemos seguir
     if (!insertError.message.includes('unique')) {
       console.error("Erro ao aceitar convite:", insertError);
       throw insertError;
     }
   }
+  
+  // Atualiza profile com school_id para contexto rápido
+  await supabase.from('profiles').update({ school_id: invite.school_id }).eq('id', userId);
 
-  // 3. Atualiza status do convite ou deleta (Optando por deletar para limpar pendências)
+  // 3. Atualiza status do convite ou deleta
   const { error: deleteError } = await supabase
     .from('invites')
     .delete()
@@ -566,15 +590,64 @@ export const acceptInvite = async (token: string, userId: string) => {
 };
 
 // ==========================================
-// FUNÇÕES DE NOTIFICAÇÃO
+// FUNÇÕES DE TAREFAS (ASSIGNMENTS)
 // ==========================================
 
+export const createAssignment = async (payload: { title: string, description: string, due_date: string, class_id: string, created_by: string }) => {
+  const { data, error } = await supabase
+    .from('assignments')
+    .insert([payload])
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+};
+
+export const getSchoolAssignments = async (schoolId: string) => {
+  const { data, error } = await supabase
+    .from('assignments')
+    .select('*, classes!inner(school_id, name)')
+    .eq('classes.school_id', schoolId)
+    .order('due_date', { ascending: true });
+
+  if (error) {
+    console.error("Erro ao buscar assignments:", error);
+    return [];
+  }
+  
+  return data.map((a: any) => ({
+     id: a.id,
+     title: a.title,
+     description: a.description,
+     class_id: a.class_id,
+     due_date: a.due_date,
+     created_at: a.created_at,
+     status: new Date(a.due_date) < new Date() ? 'expired' : 'active',
+     className: a.classes?.name
+  }));
+};
+
+
+export const getAssignmentsByClass = async (classId: string) => {
+  const { data, error } = await supabase
+    .from('assignments')
+    .select('*')
+    .eq('class_id', classId)
+    .order('due_date', { ascending: true });
+
+  if (error) throw error;
+  return data;
+};
+
+// ... (Rest of existing stats/notification functions)
 export const createNotification = async (
   userId: string,
   type: 'correction' | 'ranking' | 'system' | 'tip' | 'assignment',
   title: string,
   message: string
 ) => {
+// ...
   const { error } = await supabase
     .from('notifications')
     .insert({
