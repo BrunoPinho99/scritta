@@ -1,7 +1,7 @@
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { supabase } from '../supabaseClient';
-import { getClassesBySchool, updateUserProfile, uploadAvatar } from '../services/databaseService';
+import { getClassesBySchool, updateUserProfile } from '../services/databaseService';
 import { ClassGroup } from '../types';
 
 interface ProfileViewProps {
@@ -10,26 +10,38 @@ interface ProfileViewProps {
   currentRole?: 'student' | 'teacher' | 'school_admin';
 }
 
+const AVATAR_OPTIONS = [
+  'https://api.dicebear.com/7.x/notionists/svg?seed=Felix',
+  'https://api.dicebear.com/7.x/notionists/svg?seed=Aneka',
+  'https://api.dicebear.com/7.x/notionists/svg?seed=Milo',
+  'https://api.dicebear.com/7.x/notionists/svg?seed=Bella',
+  'https://api.dicebear.com/7.x/notionists/svg?seed=Leo',
+  'https://api.dicebear.com/7.x/notionists/svg?seed=Lilly',
+  'https://api.dicebear.com/7.x/notionists/svg?seed=Sam',
+  'https://api.dicebear.com/7.x/notionists/svg?seed=Zack',
+  'https://api.dicebear.com/7.x/notionists/svg?seed=Luna',
+  'https://api.dicebear.com/7.x/notionists/svg?seed=Oscar',
+  'https://api.dicebear.com/7.x/notionists/svg?seed=Daisy',
+  'https://api.dicebear.com/7.x/notionists/svg?seed=Max'
+];
+
 const ProfileView: React.FC<ProfileViewProps> = ({ user, onManageSubscription, currentRole }) => {
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
 
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  // Avatar Selection State
+  const [isAvatarModalOpen, setIsAvatarModalOpen] = useState(false);
 
   const [fullName, setFullName] = useState(user?.user_metadata?.full_name || "");
   const [photoUrl, setPhotoUrl] = useState(user?.user_metadata?.avatar_url || `https://ui-avatars.com/api/?name=${user?.email}&background=8B5CF6&color=fff`);
   const [schoolName, setSchoolName] = useState(user?.user_metadata?.school || "Não vinculada");
 
-  // PREFERE A ROLE PASSADA VIA PROP (Reparada no App.tsx), SENÃO TENTA METADATA
   const userType = currentRole || user?.user_metadata?.user_type;
-
-  const isInstitution = userType === 'school_admin' || userType === 'institution'; // Aceita ambos
+  const isInstitution = userType === 'school_admin' || userType === 'institution';
   const isProfessor = userType === 'teacher' || userType === 'professor';
   const schoolId = user?.user_metadata?.school_id || null;
   const [classes, setClasses] = useState<ClassGroup[]>([]);
-
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (schoolId && (isInstitution || isProfessor)) {
@@ -44,54 +56,25 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onManageSubscription, c
     }
   };
 
-
-
   const handleEdit = () => setIsEditing(true);
 
   const handleCancel = () => {
     setFullName(user?.user_metadata?.full_name || "");
     setPhotoUrl(user?.user_metadata?.avatar_url || `https://ui-avatars.com/api/?name=${user?.email}&background=8B5CF6&color=fff`);
     setSchoolName(user?.user_metadata?.school || "Não vinculada");
-    setSelectedFile(null);
     setIsEditing(false);
-  };
-
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      if (file.size > 5 * 1024 * 1024) { alert("A imagem deve ter no máximo 5MB."); return; } // Aumentei para 5MB
-
-      setSelectedFile(file);
-
-      // Preview apenas
-      const reader = new FileReader();
-      reader.onloadend = () => setPhotoUrl(reader.result as string);
-      reader.readAsDataURL(file);
-    }
   };
 
   const handleSaveProfile = async () => {
     if (!user?.id) return;
     setIsSaving(true);
     try {
-      let finalAvatarUrl = photoUrl;
-
-      // 1. Upload da Imagem (se houve alteração)
-      if (selectedFile) {
-        finalAvatarUrl = await uploadAvatar(selectedFile);
-      }
-
-      // 2. Atualizar Perfil no Banco e na Sessão
+      // Atualizar Perfil no Banco e na Sessão
       await updateUserProfile(user.id, {
         full_name: fullName,
-        school_name: schoolName, // Se for Instituição
-        avatar_url: finalAvatarUrl
+        school_name: schoolName,
+        avatar_url: photoUrl
       });
-
-      // Atualiza estado local para refletir a URL final (não o base64 do preview)
-      setPhotoUrl(finalAvatarUrl);
-      setSelectedFile(null);
-      // setIsEditing(false); // Mantém edição aberta para mostrar o botão de sucesso
 
       setIsSuccess(true);
       setTimeout(() => {
@@ -121,7 +104,6 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onManageSubscription, c
         </div>
         {!isEditing ? (
           <div className="flex gap-3">
-
             <button
               onClick={handleEdit}
               className="flex items-center gap-2 px-6 py-2.5 bg-primary text-white rounded-xl font-bold shadow-lg shadow-primary/30 hover:bg-primary-dark transition-all active:scale-95"
@@ -160,14 +142,17 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onManageSubscription, c
           <div className="bg-white dark:bg-surface-dark rounded-[2rem] p-8 border border-gray-100 dark:border-slate-800 shadow-sm flex flex-col items-center text-center">
             <div className="relative mb-6">
               <div className="w-32 h-32 rounded-full p-1 bg-gradient-to-tr from-primary to-blue-400 shadow-xl relative group">
-                <img src={photoUrl} alt="Profile" className="w-full h-full rounded-full object-cover border-4 border-white dark:border-surface-dark" />
+                <img src={photoUrl} alt="Profile" className="w-full h-full rounded-full object-cover border-4 border-white dark:border-surface-dark bg-white" />
                 {isEditing && (
-                  <button onClick={() => fileInputRef.current?.click()} className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity">
-                    <span className="material-icons-outlined">photo_camera</span>
+                  <button
+                    onClick={() => setIsAvatarModalOpen(true)}
+                    className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
+                  >
+                    <span className="material-icons-outlined text-3xl">collections</span>
                   </button>
                 )}
               </div>
-              <input type="file" ref={fileInputRef} onChange={handleFileChange} accept="image/*" className="hidden" />
+              {isEditing && <p className="text-xs text-primary font-bold mt-2 cursor-pointer hover:underline" onClick={() => setIsAvatarModalOpen(true)}>Alterar foto</p>}
             </div>
             <h2 className="text-xl font-black text-gray-900 dark:text-white truncate w-full">{fullName || "Sem Nome"}</h2>
             <p className="text-gray-400 text-sm font-bold truncate w-full mb-6">{user?.email}</p>
@@ -229,6 +214,50 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onManageSubscription, c
           )}
         </div>
       </div>
+
+      {/* Avatar Selection Modal */}
+      {isAvatarModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-6 animate-fade-in">
+          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-md" onClick={() => setIsAvatarModalOpen(false)}></div>
+          <div className="relative bg-white dark:bg-surface-dark w-full max-w-lg rounded-[2.5rem] shadow-2xl overflow-hidden animate-scale-in border border-gray-100 dark:border-white/10">
+            <div className="p-8 border-b border-gray-100 dark:border-white/5">
+              <h3 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight">Escolha seu Avatar</h3>
+              <p className="text-gray-500 text-sm mt-1">Selecione uma imagem para personalizar seu perfil.</p>
+            </div>
+            <div className="p-8 grid grid-cols-3 sm:grid-cols-4 gap-4 max-h-[60vh] overflow-y-auto">
+              {AVATAR_OPTIONS.map((avatar, index) => (
+                <button
+                  key={index}
+                  onClick={() => {
+                    setPhotoUrl(avatar);
+                    setIsAvatarModalOpen(false);
+                  }}
+                  className={`relative aspect-square rounded-2xl overflow-hidden group border-2 transition-all ${photoUrl === avatar
+                      ? 'border-primary ring-2 ring-primary/30'
+                      : 'border-transparent hover:border-gray-200 dark:hover:border-slate-700'
+                    }`}
+                >
+                  <img src={avatar} alt={`Avatar ${index + 1}`} className="w-full h-full object-cover bg-gray-50 dark:bg-slate-800" />
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors"></div>
+                  {photoUrl === avatar && (
+                    <div className="absolute top-2 right-2 w-5 h-5 bg-primary rounded-full flex items-center justify-center text-white">
+                      <span className="material-icons-outlined text-xs font-bold">check</span>
+                    </div>
+                  )}
+                </button>
+              ))}
+            </div>
+            <div className="p-6 border-t border-gray-100 dark:border-white/5 flex justify-end">
+              <button
+                onClick={() => setIsAvatarModalOpen(false)}
+                className="px-6 py-3 bg-gray-100 dark:bg-slate-800 text-gray-700 dark:text-gray-300 rounded-xl font-bold hover:bg-gray-200 dark:hover:bg-slate-700 transition-colors"
+              >
+                Cancelar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
