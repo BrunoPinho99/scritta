@@ -1,7 +1,7 @@
-
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI, Type, Schema } from "@google/genai"; // Certifique-se de importar Schema se necessário, ou use Type
 import { CorrectionResult, EssayInput, Topic } from "../types";
 
+// Função auxiliar para limpar JSON (mantida)
 const cleanJsonString = (str: string) => {
   if (!str) return "{}";
   let cleaned = str.replace(/```json/g, '').replace(/```/g, '').trim();
@@ -13,18 +13,23 @@ const cleanJsonString = (str: string) => {
   return cleaned;
 };
 
+// Configuração centralizada do modelo para facilitar trocas futuras
+// Recomendação: Use 'gemini-2.0-flash-exp' ou 'gemini-1.5-flash' para maior estabilidade
+const MODEL_NAME = "gemini-2.0-flash-exp"; 
+
 export const generateCustomTopic = async (userInterest: string): Promise<Topic> => {
+  // Inicializa o cliente. O novo SDK aceita { apiKey } diretamente.
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: [{ text: `Tema solicitado: ${userInterest}` }],
+      model: MODEL_NAME,
+      contents: [{ role: 'user', parts: [{ text: `Tema solicitado: ${userInterest}` }] }], // Estrutura mais robusta
       config: {
         systemInstruction: "Aja como gerador instantâneo de temas ENEM. Forneça um título e 2 textos de apoio curtos com dados. Saída: JSON estrito.",
         responseMimeType: "application/json",
-        temperature: 0.2, // Minimizando criatividade para máxima velocidade
-        thinkingConfig: { thinkingBudget: 0 },
+        temperature: 0.3,
+        // thinkingConfig removido para evitar conflitos se o modelo não suportar ou se o budget 0 for inválido
         responseSchema: {
           type: Type.OBJECT,
           properties: {
@@ -48,13 +53,18 @@ export const generateCustomTopic = async (userInterest: string): Promise<Topic> 
       }
     });
 
-    const result = JSON.parse(cleanJsonString(response.text));
+    // Verificação de segurança para resposta nula
+    const responseText = response.text;
+    if (!responseText) throw new Error("Resposta vazia da IA");
+
+    const result = JSON.parse(cleanJsonString(responseText));
     return {
       id: crypto.randomUUID(),
       title: result.title,
       supportTexts: result.supportTexts
     };
   } catch (error: any) {
+    console.error("Erro generateCustomTopic:", error);
     throw new Error("Erro ao gerar tema rápido.");
   }
 };
@@ -64,8 +74,8 @@ export const generateAssignmentTheme = async (teacherPrompt: string): Promise<To
   
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: [{ text: `Criar tema de redação ENEM sobre: ${teacherPrompt}` }],
+      model: MODEL_NAME,
+      contents: [{ role: 'user', parts: [{ text: `Criar tema de redação ENEM sobre: ${teacherPrompt}` }] }],
       config: {
         systemInstruction: `Você é um especialista em criar temas de redação para o ENEM.
 
@@ -82,7 +92,6 @@ REQUISITOS:
 FORMATO: JSON estrito conforme o schema.`,
         responseMimeType: "application/json",
         temperature: 0.3,
-        thinkingConfig: { thinkingBudget: 0 },
         responseSchema: {
           type: Type.OBJECT,
           properties: {
@@ -106,7 +115,10 @@ FORMATO: JSON estrito conforme o schema.`,
       }
     });
 
-    const result = JSON.parse(cleanJsonString(response.text));
+    const responseText = response.text;
+    if (!responseText) throw new Error("Resposta vazia da IA");
+
+    const result = JSON.parse(cleanJsonString(responseText));
     return {
       id: crypto.randomUUID(),
       title: result.title,
@@ -152,20 +164,32 @@ export const correctEssay = async (topicTitle: string, input: EssayInput): Promi
   } else {
     parts = [
       { text: `Analise a imagem da redação manuscrita sobre o tema: ${topicTitle}` },
-      { inlineData: { mimeType: input.mimeType, data: input.base64 } }
+      // Estrutura inlineData correta para o novo SDK
+      { 
+        inlineData: { 
+          mimeType: input.mimeType, 
+          data: input.base64 
+        } 
+      }
     ];
   }
 
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
-      contents: { parts },
+      model: MODEL_NAME, // Usando modelo estável
+      // AQUI ESTAVA O ERRO PRINCIPAL: contents deve ser um array de objetos Content
+      contents: [
+        {
+          role: 'user',
+          parts: parts
+        }
+      ],
       config: {
         systemInstruction,
         responseMimeType: "application/json",
         temperature: 0.1,
         maxOutputTokens: 2000,
-        thinkingConfig: { thinkingBudget: 0 },
+        // thinkingConfig removido para garantir JSON estrito sem interferência
         responseSchema: {
           type: Type.OBJECT,
           properties: {
@@ -191,10 +215,13 @@ export const correctEssay = async (topicTitle: string, input: EssayInput): Promi
       },
     });
 
-    return JSON.parse(cleanJsonString(response.text)) as CorrectionResult;
+    const responseText = response.text;
+    if (!responseText) throw new Error("Resposta vazia da IA");
+
+    return JSON.parse(cleanJsonString(responseText)) as CorrectionResult;
 
   } catch (error: any) {
-    console.error("Erro na apuração:", error.message);
+    console.error("Erro na apuração:", error); // Log do erro real para debug
     throw new Error("Falha ao gerar apuração. Tente novamente.");
   }
 };
