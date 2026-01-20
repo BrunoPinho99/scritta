@@ -1,7 +1,7 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { supabase } from '../supabaseClient';
-import { getClassesBySchool, updateUserProfile } from '../services/databaseService';
+import { getClassesBySchool, updateUserProfile, uploadAvatar } from '../services/databaseService';
 import { ClassGroup } from '../types';
 
 interface ProfileViewProps {
@@ -32,6 +32,8 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onManageSubscription, c
 
   // Avatar Selection State
   const [isAvatarModalOpen, setIsAvatarModalOpen] = useState(false);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [fullName, setFullName] = useState(user?.user_metadata?.full_name || "");
   const [photoUrl, setPhotoUrl] = useState(user?.user_metadata?.avatar_url || `https://ui-avatars.com/api/?name=${user?.email}&background=8B5CF6&color=fff`);
@@ -63,6 +65,34 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onManageSubscription, c
     setPhotoUrl(user?.user_metadata?.avatar_url || `https://ui-avatars.com/api/?name=${user?.email}&background=8B5CF6&color=fff`);
     setSchoolName(user?.user_metadata?.school || "Não vinculada");
     setIsEditing(false);
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validar tipo de arquivo
+    if (!file.type.startsWith('image/')) {
+      alert('Por favor, selecione apenas arquivos de imagem.');
+      return;
+    }
+
+    // Validar tamanho (máx 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      alert('A imagem deve ter no máximo 5MB.');
+      return;
+    }
+
+    setIsUploadingAvatar(true);
+    try {
+      const publicUrl = await uploadAvatar(file);
+      setPhotoUrl(publicUrl);
+      setIsAvatarModalOpen(false);
+    } catch (error: any) {
+      alert('Erro ao fazer upload: ' + error.message);
+    } finally {
+      setIsUploadingAvatar(false);
+    }
   };
 
   const handleSaveProfile = async () => {
@@ -222,9 +252,46 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onManageSubscription, c
           <div className="relative bg-white dark:bg-surface-dark w-full max-w-lg rounded-[2.5rem] shadow-2xl overflow-hidden animate-scale-in border border-gray-100 dark:border-white/10">
             <div className="p-8 border-b border-gray-100 dark:border-white/5">
               <h3 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight">Escolha seu Avatar</h3>
-              <p className="text-gray-500 text-sm mt-1">Selecione uma imagem para personalizar seu perfil.</p>
+              <p className="text-gray-500 text-sm mt-1">Selecione uma imagem pré-definida ou faça upload da sua própria foto.</p>
             </div>
-            <div className="p-8 grid grid-cols-3 sm:grid-cols-4 gap-4 max-h-[60vh] overflow-y-auto">
+
+            {/* Upload Custom Photo */}
+            <div className="px-8 pt-6">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleFileUpload}
+                className="hidden"
+              />
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isUploadingAvatar}
+                className="w-full py-4 px-6 bg-gradient-to-r from-primary to-purple-600 text-white rounded-2xl font-bold shadow-lg shadow-primary/30 hover:shadow-xl hover:scale-[1.02] transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3"
+              >
+                {isUploadingAvatar ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                    Enviando...
+                  </>
+                ) : (
+                  <>
+                    <span className="material-icons-outlined text-xl">cloud_upload</span>
+                    Fazer Upload da Minha Foto
+                  </>
+                )}
+              </button>
+              <p className="text-xs text-gray-400 text-center mt-2">JPG, PNG ou GIF • Máx 5MB</p>
+            </div>
+
+            {/* Divider */}
+            <div className="px-8 py-4 flex items-center gap-3">
+              <div className="flex-1 h-px bg-gray-200 dark:bg-slate-700"></div>
+              <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Ou escolha um avatar</span>
+              <div className="flex-1 h-px bg-gray-200 dark:bg-slate-700"></div>
+            </div>
+
+            <div className="px-8 pb-8 grid grid-cols-3 sm:grid-cols-4 gap-4 max-h-[40vh] overflow-y-auto">
               {AVATAR_OPTIONS.map((avatar, index) => (
                 <button
                   key={index}
@@ -233,8 +300,8 @@ const ProfileView: React.FC<ProfileViewProps> = ({ user, onManageSubscription, c
                     setIsAvatarModalOpen(false);
                   }}
                   className={`relative aspect-square rounded-2xl overflow-hidden group border-2 transition-all ${photoUrl === avatar
-                      ? 'border-primary ring-2 ring-primary/30'
-                      : 'border-transparent hover:border-gray-200 dark:hover:border-slate-700'
+                    ? 'border-primary ring-2 ring-primary/30'
+                    : 'border-transparent hover:border-gray-200 dark:hover:border-slate-700'
                     }`}
                 >
                   <img src={avatar} alt={`Avatar ${index + 1}`} className="w-full h-full object-cover bg-gray-50 dark:bg-slate-800" />

@@ -593,7 +593,15 @@ export const acceptInvite = async (token: string, userId: string) => {
 // FUNÇÕES DE TAREFAS (ASSIGNMENTS)
 // ==========================================
 
-export const createAssignment = async (payload: { title: string, description: string, due_date: string, class_id: string, created_by: string }) => {
+export const createAssignment = async (payload: { 
+  title: string, 
+  description: string, 
+  due_date: string, 
+  class_id: string, 
+  created_by: string,
+  theme?: string,
+  support_texts?: any[]
+}) => {
   const { data, error } = await supabase
     .from('assignments')
     .insert([payload])
@@ -639,6 +647,18 @@ export const getAssignmentsByClass = async (classId: string) => {
   if (error) throw error;
   return data;
 };
+
+export const getAssignmentDetails = async (assignmentId: string) => {
+  const { data, error } = await supabase
+    .from('assignments')
+    .select('*')
+    .eq('id', assignmentId)
+    .single();
+
+  if (error) throw error;
+  return data;
+};
+
 
 // ... (Rest of existing stats/notification functions)
 export const createNotification = async (

@@ -20,6 +20,7 @@ import {
   createAssignment,
   getSchoolAssignments
 } from '../services/databaseService';
+import { generateAssignmentTheme } from '../services/geminiService';
 import RankingView from './RankingView';
 
 interface InstitutionDashboardProps {
@@ -56,6 +57,11 @@ const InstitutionDashboard: React.FC<InstitutionDashboardProps> = ({ initialTab 
   const [isAssignmentModalOpen, setIsAssignmentModalOpen] = useState(false);
   const [newAssignment, setNewAssignment] = useState({ title: '', description: '', class_id: '', due_date: '' });
   const [isSavingAssignment, setIsSavingAssignment] = useState(false);
+
+  // States for AI Theme Generation
+  const [themePrompt, setThemePrompt] = useState('');
+  const [generatedTheme, setGeneratedTheme] = useState<any>(null);
+  const [isGeneratingTheme, setIsGeneratingTheme] = useState(false);
 
   // States for Student Modal
   const [isStudentModalOpen, setIsStudentModalOpen] = useState(false);
@@ -224,6 +230,23 @@ const InstitutionDashboard: React.FC<InstitutionDashboardProps> = ({ initialTab 
   };
 
 
+  const handleGenerateTheme = async () => {
+    if (!themePrompt.trim()) {
+      alert("Por favor, descreva o tema desejado.");
+      return;
+    }
+
+    setIsGeneratingTheme(true);
+    try {
+      const theme = await generateAssignmentTheme(themePrompt);
+      setGeneratedTheme(theme);
+    } catch (error: any) {
+      alert("Erro ao gerar tema: " + error.message);
+    } finally {
+      setIsGeneratingTheme(false);
+    }
+  };
+
   const handleCreateAssignment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newAssignment.title || !newAssignment.class_id || !newAssignment.due_date) {
@@ -240,13 +263,17 @@ const InstitutionDashboard: React.FC<InstitutionDashboardProps> = ({ initialTab 
         description: newAssignment.description,
         class_id: newAssignment.class_id,
         due_date: newAssignment.due_date,
-        created_by: session?.user?.id || ''
+        created_by: session?.user?.id || '',
+        theme: generatedTheme?.title,
+        support_texts: generatedTheme?.supportTexts
       });
 
       if (created) {
         setAssignments(prev => [...prev, created]);
         setIsAssignmentModalOpen(false);
         setNewAssignment({ title: '', description: '', class_id: '', due_date: '' });
+        setGeneratedTheme(null);
+        setThemePrompt('');
         alert("Atividade criada com sucesso!");
       }
     } catch (error: any) {
@@ -1181,6 +1208,194 @@ const InstitutionDashboard: React.FC<InstitutionDashboardProps> = ({ initialTab 
                   </button>
                 </div>
               </div>
+            </div>
+          </div>
+        )
+      }
+
+      {/* Modal Nova Atividade */}
+      {
+        isAssignmentModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-6 animate-fade-in overflow-y-auto">
+            <div
+              className="absolute inset-0 bg-slate-900/60 backdrop-blur-md"
+              onClick={() => {
+                setIsAssignmentModalOpen(false);
+                setGeneratedTheme(null);
+                setThemePrompt('');
+              }}
+            ></div>
+            <div className="relative bg-white dark:bg-surface-dark w-full max-w-3xl rounded-[2.5rem] shadow-2xl overflow-hidden animate-scale-in border border-gray-100 dark:border-white/10 my-8">
+              <div className="p-8 border-b border-gray-100 dark:border-white/5">
+                <h3 className="text-2xl font-black text-gray-900 dark:text-white tracking-tight">Nova Atividade</h3>
+                <p className="text-gray-500 text-sm mt-1">Crie uma atividade com tema gerado por IA para sua turma.</p>
+              </div>
+
+              <form onSubmit={handleCreateAssignment} className="p-8 space-y-6 max-h-[70vh] overflow-y-auto">
+                {/* Campos Básicos */}
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Título da Atividade</label>
+                  <input
+                    type="text"
+                    value={newAssignment.title}
+                    onChange={e => setNewAssignment({ ...newAssignment, title: e.target.value })}
+                    placeholder="Ex: Redação sobre Tecnologia e Sociedade"
+                    className="w-full px-5 py-4 rounded-2xl bg-gray-50 dark:bg-white/5 border border-transparent focus:border-primary/30 focus:bg-white dark:focus:bg-white/10 outline-none font-bold text-sm transition-all"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Descrição (Opcional)</label>
+                  <textarea
+                    value={newAssignment.description}
+                    onChange={e => setNewAssignment({ ...newAssignment, description: e.target.value })}
+                    placeholder="Instruções adicionais para os alunos..."
+                    className="w-full px-5 py-4 rounded-2xl bg-gray-50 dark:bg-white/5 border border-transparent focus:border-primary/30 focus:bg-white dark:focus:bg-white/10 outline-none font-bold text-sm transition-all resize-none"
+                    rows={3}
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Turma</label>
+                    <select
+                      value={newAssignment.class_id}
+                      onChange={e => setNewAssignment({ ...newAssignment, class_id: e.target.value })}
+                      className="w-full px-5 py-4 rounded-2xl bg-gray-50 dark:bg-white/5 border border-transparent focus:border-primary/30 focus:bg-white dark:focus:bg-white/10 outline-none font-bold text-sm transition-all appearance-none"
+                      required
+                    >
+                      <option value="">Selecione uma turma...</option>
+                      {classes.map(cls => (
+                        <option key={cls.id} value={cls.id}>{cls.name} ({cls.shift})</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Data de Entrega</label>
+                    <input
+                      type="date"
+                      value={newAssignment.due_date}
+                      onChange={e => setNewAssignment({ ...newAssignment, due_date: e.target.value })}
+                      className="w-full px-5 py-4 rounded-2xl bg-gray-50 dark:bg-white/5 border border-transparent focus:border-primary/30 focus:bg-white dark:focus:bg-white/10 outline-none font-bold text-sm transition-all"
+                      required
+                    />
+                  </div>
+                </div>
+
+                {/* Seção de Geração de Tema com IA */}
+                <div className="pt-6 border-t border-gray-100 dark:border-white/5">
+                  <div className="bg-gradient-to-br from-primary/5 to-purple-500/5 p-6 rounded-2xl border border-primary/10">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                        <span className="material-icons-outlined text-primary">auto_awesome</span>
+                      </div>
+                      <div>
+                        <h4 className="font-black text-gray-900 dark:text-white">Gerar Tema com IA</h4>
+                        <p className="text-xs text-gray-500">Crie um tema ENEM completo com 2 textos base</p>
+                      </div>
+                    </div>
+
+                    <div className="space-y-3">
+                      <input
+                        type="text"
+                        value={themePrompt}
+                        onChange={e => setThemePrompt(e.target.value)}
+                        placeholder="Ex: Impactos da inteligência artificial no mercado de trabalho"
+                        className="w-full px-5 py-4 rounded-xl bg-white dark:bg-surface-dark border border-gray-200 dark:border-white/10 focus:border-primary/30 outline-none font-bold text-sm transition-all"
+                        disabled={isGeneratingTheme}
+                      />
+
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={handleGenerateTheme}
+                          disabled={isGeneratingTheme || !themePrompt.trim()}
+                          className="flex-1 py-3 rounded-xl font-bold text-white bg-primary hover:bg-primary-dark shadow-lg shadow-primary/20 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                        >
+                          {isGeneratingTheme ? (
+                            <>
+                              <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                              Gerando...
+                            </>
+                          ) : (
+                            <>
+                              <span className="material-icons-outlined text-lg">auto_awesome</span>
+                              Gerar Tema
+                            </>
+                          )}
+                        </button>
+
+                        {generatedTheme && (
+                          <button
+                            type="button"
+                            onClick={handleGenerateTheme}
+                            disabled={isGeneratingTheme}
+                            className="px-4 py-3 rounded-xl font-bold text-primary bg-primary/10 hover:bg-primary/20 transition-all active:scale-95 disabled:opacity-50"
+                            title="Regenerar Tema"
+                          >
+                            <span className="material-icons-outlined">refresh</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Preview do Tema Gerado */}
+                    {generatedTheme && (
+                      <div className="mt-6 space-y-4 animate-fade-in">
+                        <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400">
+                          <span className="material-icons-outlined text-lg">check_circle</span>
+                          <span className="text-xs font-black uppercase tracking-wider">Tema Gerado com Sucesso</span>
+                        </div>
+
+                        <div className="bg-white dark:bg-surface-dark p-5 rounded-xl border border-gray-200 dark:border-white/10">
+                          <h5 className="font-black text-gray-900 dark:text-white mb-4 text-lg">{generatedTheme.title}</h5>
+
+                          <div className="space-y-3">
+                            {generatedTheme.supportTexts?.map((text: any, idx: number) => (
+                              <div key={idx} className="bg-gray-50 dark:bg-white/5 p-4 rounded-lg">
+                                <div className="flex items-start gap-3">
+                                  <span className="material-icons-outlined text-primary text-xl">{text.icon}</span>
+                                  <div className="flex-1">
+                                    <h6 className="font-bold text-sm text-gray-900 dark:text-white mb-1">{text.title}</h6>
+                                    <p className="text-xs text-gray-600 dark:text-gray-400 line-clamp-3">{text.content}</p>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex gap-3 mt-8 pt-6 border-t border-gray-100 dark:border-white/5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsAssignmentModalOpen(false);
+                      setGeneratedTheme(null);
+                      setThemePrompt('');
+                    }}
+                    className="flex-1 py-4 rounded-xl font-bold text-gray-500 hover:bg-gray-100 dark:hover:bg-white/5 transition-colors"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSavingAssignment || classes.length === 0}
+                    className="flex-1 py-4 rounded-xl font-bold text-white bg-primary hover:bg-primary-dark shadow-lg shadow-primary/20 transition-all active:scale-95 disabled:opacity-70 flex items-center justify-center gap-2"
+                  >
+                    {isSavingAssignment ? (
+                      <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div>
+                    ) : (
+                      "Criar Atividade"
+                    )}
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         )

@@ -59,6 +59,66 @@ export const generateCustomTopic = async (userInterest: string): Promise<Topic> 
   }
 };
 
+export const generateAssignmentTheme = async (teacherPrompt: string): Promise<Topic> => {
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: [{ text: `Criar tema de redação ENEM sobre: ${teacherPrompt}` }],
+      config: {
+        systemInstruction: `Você é um especialista em criar temas de redação para o ENEM.
+
+TAREFA: Gerar um tema de redação completo baseado no interesse fornecido pelo professor.
+
+REQUISITOS:
+1. Título do tema: Deve ser claro, objetivo e no formato ENEM (geralmente uma frase que apresenta o problema/questão)
+2. Exatamente 2 textos de apoio curtos (150-200 palavras cada):
+   - Texto 1: Contexto histórico, dados estatísticos ou definição do problema
+   - Texto 2: Perspectiva atual, exemplos concretos ou impactos sociais
+3. Cada texto deve ter um título descritivo
+4. Use ícones apropriados: "article", "analytics", "public", "school", "science", "gavel", "eco", "health_and_safety"
+
+FORMATO: JSON estrito conforme o schema.`,
+        responseMimeType: "application/json",
+        temperature: 0.3,
+        thinkingConfig: { thinkingBudget: 0 },
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            title: { type: Type.STRING },
+            supportTexts: {
+              type: Type.ARRAY,
+              items: {
+                type: Type.OBJECT,
+                properties: {
+                  id: { type: Type.STRING },
+                  title: { type: Type.STRING },
+                  content: { type: Type.STRING },
+                  icon: { type: Type.STRING }
+                },
+                required: ["id", "title", "content", "icon"]
+              }
+            }
+          },
+          required: ["title", "supportTexts"]
+        }
+      }
+    });
+
+    const result = JSON.parse(cleanJsonString(response.text));
+    return {
+      id: crypto.randomUUID(),
+      title: result.title,
+      supportTexts: result.supportTexts
+    };
+  } catch (error: any) {
+    console.error("Erro ao gerar tema de atividade:", error);
+    throw new Error("Erro ao gerar tema. Tente novamente.");
+  }
+};
+
+
 export const correctEssay = async (topicTitle: string, input: EssayInput): Promise<CorrectionResult> => {
   const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
