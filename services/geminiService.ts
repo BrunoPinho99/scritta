@@ -15,11 +15,21 @@ const cleanJsonString = (str: string) => {
 
 // Configuração centralizada do modelo para facilitar trocas futuras
 // Recomendação: Use 'gemini-2.0-flash-exp' ou 'gemini-1.5-flash' para maior estabilidade
-const MODEL_NAME = "gemini-2.0-flash-exp"; 
+const MODEL_NAME = "gemini-flash-latest"; 
 
 export const generateCustomTopic = async (userInterest: string): Promise<Topic> => {
   // Inicializa o cliente. O novo SDK aceita { apiKey } diretamente.
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+  const apiKey = process.env.API_KEY;
+  
+  // Debug: verificar se a API key está sendo carregada
+  console.log('🔑 API Key presente?', apiKey ? 'SIM' : 'NÃO');
+  console.log('🔑 Primeiros 10 caracteres:', apiKey?.substring(0, 10) || 'UNDEFINED');
+  
+  if (!apiKey) {
+    throw new Error('GEMINI_API_KEY não configurada. Verifique o arquivo .env e reinicie o servidor.');
+  }
+  
+  const ai = new GoogleGenAI({ apiKey });
   
   try {
     const response = await ai.models.generateContent({
