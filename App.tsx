@@ -54,6 +54,18 @@ const App: React.FC = () => {
   useEffect(() => { currentViewRef.current = currentView; }, [currentView]);
   useEffect(() => { hasActiveSessionRef.current = hasActiveSession; }, [hasActiveSession]);
 
+  // Safety Timeout para evitar travamento infinito no loading
+  useEffect(() => {
+    const safetyTimer = setTimeout(() => {
+      if (isInitializing || isCheckingRole) {
+        console.warn("⚠️ Loading demorou muito. Forçando exibição da tela.");
+        setIsInitializing(false);
+        setIsCheckingRole(false);
+      }
+    }, 8000); // 8 segundos de timeout máximo
+
+    return () => clearTimeout(safetyTimer);
+  }, [isInitializing, isCheckingRole]);
   const [writingTopicTitle, setWritingTopicTitle] = useState("");
   const [isCorrecting, setIsCorrecting] = useState(false);
   const [correctionResult, setCorrectionResult] = useState<CorrectionResult | null>(null);
@@ -74,8 +86,11 @@ const App: React.FC = () => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!session) {
         setIsInitializing(false);
+      } else {
+        // Se já tem sessão no load inicial, seta imediatamente para evitar flash
+        setSession(session);
+        // Deixa o onAuthStateChange cuidar do resto ou força checagem aqui se necessário
       }
-      // Se houver sessão, o onAuthStateChange vai lidar
     });
 
     // 2. Escutar mudanças de estado (Login, Logout, Inicialização com Sessão)
