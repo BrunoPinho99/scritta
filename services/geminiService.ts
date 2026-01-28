@@ -17,21 +17,20 @@ const cleanJsonString = (str: string) => {
 // Recomendação: Use 'gemini-1.5-flash' para maior estabilidade e performance
 const MODEL_NAME = "gemini-1.5-flash"; 
 
-export const generateCustomTopic = async (userInterest: string): Promise<Topic> => {
-  // Inicializa o cliente. O novo SDK aceita { apiKey } diretamente.
-  const apiKey = process.env.API_KEY;
-  
-  // Debug: verificar se a API key está sendo carregada
-  console.log('🔑 API Key presente?', apiKey ? 'SIM' : 'NÃO');
+const getGeminiClient = () => {
+  const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY;
   
   if (!apiKey) {
     console.error("CRITICAL: GEMINI_API_KEY is missing in process.env");
-    throw new Error('Chave de API do Gemini não configurada. Verifique o arquivo .env e reinicie o servidor.');
+    throw new Error('Chave de API do Gemini não configurada. Se estiver em produção, adicione GEMINI_API_KEY às variáveis de ambiente.');
   }
   
-  const ai = new GoogleGenAI({ apiKey });
-  
+  return new GoogleGenAI({ apiKey });
+};
+
+export const generateCustomTopic = async (userInterest: string): Promise<Topic> => {
   try {
+    const ai = getGeminiClient();
     const response = await ai.models.generateContent({
       model: MODEL_NAME,
       contents: [{ role: 'user', parts: [{ text: `Tema solicitado: ${userInterest}` }] }], // Estrutura mais robusta
@@ -39,7 +38,7 @@ export const generateCustomTopic = async (userInterest: string): Promise<Topic> 
         systemInstruction: "Aja como gerador instantâneo de temas ENEM. Forneça um título e 2 textos de apoio curtos com dados. Saída: JSON estrito.",
         responseMimeType: "application/json",
         temperature: 0.3,
-        // thinkingConfig removido para evitar conflitos se o modelo não suportar ou se o budget 0 for inválido
+        // thinkingConfig removido para evitar conflitos
         responseSchema: {
           type: Type.OBJECT,
           properties: {
@@ -75,31 +74,21 @@ export const generateCustomTopic = async (userInterest: string): Promise<Topic> 
     };
   } catch (error: any) {
     console.error("Erro generateCustomTopic:", error);
-    throw new Error("Erro ao gerar tema rápido.");
+    throw new Error(error.message || "Erro ao gerar tema rápido.");
   }
 };
 
 export const generateAssignmentTheme = async (teacherPrompt: string): Promise<Topic> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  
   try {
+    const ai = getGeminiClient();
     const response = await ai.models.generateContent({
       model: MODEL_NAME,
       contents: [{ role: 'user', parts: [{ text: `Criar tema de redação ENEM sobre: ${teacherPrompt}` }] }],
       config: {
         systemInstruction: `Você é um especialista em criar temas de redação para o ENEM.
-
-TAREFA: Gerar um tema de redação completo baseado no interesse fornecido pelo professor.
-
-REQUISITOS:
-1. Título do tema: Deve ser claro, objetivo e no formato ENEM (geralmente uma frase que apresenta o problema/questão)
-2. Exatamente 2 textos de apoio curtos (150-200 palavras cada):
-   - Texto 1: Contexto histórico, dados estatísticos ou definição do problema
-   - Texto 2: Perspectiva atual, exemplos concretos ou impactos sociais
-3. Cada texto deve ter um título descritivo
-4. Use ícones apropriados: "article", "analytics", "public", "school", "science", "gavel", "eco", "health_and_safety"
-
-FORMATO: JSON estrito conforme o schema.`,
+Tópico: ${teacherPrompt}
+Requisitos: Título e 2 textos de apoio.
+Saída: JSON estrito.`,
         responseMimeType: "application/json",
         temperature: 0.3,
         responseSchema: {
@@ -136,14 +125,12 @@ FORMATO: JSON estrito conforme o schema.`,
     };
   } catch (error: any) {
     console.error("Erro ao gerar tema de atividade:", error);
-    throw new Error("Erro ao gerar tema. Tente novamente.");
+    throw new Error(error.message || "Erro ao gerar tema. Tente novamente.");
   }
 };
 
 
 export const correctEssay = async (topicTitle: string, input: EssayInput): Promise<CorrectionResult> => {
-  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-  
   const systemInstruction = `Você é a banca examinadora oficial do ENEM, extremamente rigorosa quanto à autoria.
 
   TAREFA CRÍTICA 1: DETECÇÃO DE I.A. (ANTI-PLÁGIO)
@@ -185,6 +172,7 @@ export const correctEssay = async (topicTitle: string, input: EssayInput): Promi
   }
 
   try {
+    const ai = getGeminiClient();
     const response = await ai.models.generateContent({
       model: MODEL_NAME, // Usando modelo estável
       // AQUI ESTAVA O ERRO PRINCIPAL: contents deve ser um array de objetos Content
@@ -232,6 +220,6 @@ export const correctEssay = async (topicTitle: string, input: EssayInput): Promi
 
   } catch (error: any) {
     console.error("Erro na apuração:", error); // Log do erro real para debug
-    throw new Error("Falha ao gerar apuração. Tente novamente.");
+    throw new Error(error.message || "Falha ao gerar apuração. Tente novamente.");
   }
 };
