@@ -15,8 +15,7 @@ const cleanJsonString = (str: string) => {
 
 // Configuração centralizada do modelo para facilitar trocas futuras
 // Recomendação: Use 'gemini-1.5-flash' para maior estabilidade e performance
-const MODEL_NAME = "gemini-1.5-flash"; 
-
+const MODEL_NAME = "gemini-1.5-flash-latest";
 const getGeminiClient = () => {
   // Tenta pegar do ambiente, senão usa o fallback (Hardcoded para garantir funcionamento no deploy)
   const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY || "AIzaSyAIlKI9KBHY8lsxqNQbUvnoYuYURNbsYpc";
