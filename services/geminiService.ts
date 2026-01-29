@@ -18,11 +18,12 @@ const cleanJsonString = (str: string) => {
 const MODEL_NAME = "gemini-1.5-flash"; 
 
 const getGeminiClient = () => {
-  const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY;
+  // Tenta pegar do ambiente, senão usa o fallback (Hardcoded para garantir funcionamento no deploy)
+  const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY || "AIzaSyAIlKI9KBHY8lsxqNQbUvnoYuYURNbsYpc";
   
   if (!apiKey) {
-    console.error("CRITICAL: GEMINI_API_KEY is missing in process.env");
-    throw new Error('Chave de API do Gemini não configurada. Se estiver em produção, adicione GEMINI_API_KEY às variáveis de ambiente.');
+    console.error("CRITICAL: GEMINI_API_KEY is missing");
+    throw new Error('Chave de API do Gemini não configurada.');
   }
   
   return new GoogleGenAI({ apiKey });
