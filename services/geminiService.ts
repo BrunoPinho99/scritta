@@ -18,7 +18,7 @@ export const generateCustomTopic = async (userInterest: string): Promise<Topic> 
 
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-1.5-flash-latest",
+      model: "gemini-1.5-flash-001",
       contents: [{ text: `Tema solicitado: ${userInterest}` }],
       config: {
         systemInstruction: "Aja como gerador instantâneo de temas ENEM. Forneça um título e 2 textos de apoio curtos com dados. Saída: JSON estrito.",
